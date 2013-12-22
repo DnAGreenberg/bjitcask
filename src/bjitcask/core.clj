@@ -13,7 +13,7 @@
 
 (defrecord Entry [key value ^long tstamp])
 (defrecord HintEntry [key ^long offset ^long total-len ^long tstamp])
-(defrecord KeyDirEntry [key file ^long value-offset ^long value-len ^long tstamp])
+(defrecord KeyDirValue [file ^long value-offset ^long value-len ^long tstamp])
 
 (defprotocol SerDes
   (decode-entries [this seq-of-buffers] "Returns a seq of Entries.")
