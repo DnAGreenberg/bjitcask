@@ -9,7 +9,10 @@
         put-chan (async/chan)]
     (async/go-loop [{data-file :data hint-file :hint :as files} (core/create fs)
                     curr-offset 0]
-                   (let [[key value ack-chan] (async/<! put-chan)
+                   (let [{:keys [op ack-chan] :as command} (async/<! put-chan)
+                         [key value] (case op
+                                       :put [(:key command) (:value command)]
+                                       :alter ((:fun command)))
                          key-len (.length key)
                          value-len (.length value)
                          ; TODO aysylu: refactor the hardcoded 14 bytes into
@@ -45,5 +48,11 @@
               entry (core/decode-entry serdes value-bytes)]
           (:value entry)))
       (put [_ key value] (let [ack-chan (async/chan)]
-                         (async/>!! put-chan [key value ack-chan])))
-      (alter [_ fun] ()))))
+                         (async/>!! put-chan {:op :put
+                                              :key key
+                                              :value value
+                                              :ack-chan ack-chan})))
+      (alter [_ fun] (let [ack-chan (async/chan)]
+                       (async/>!! put-chan {:op :alter
+                                            :fun fun
+                                            :ack-chan ack-chan}))))))
