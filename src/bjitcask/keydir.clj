@@ -38,8 +38,10 @@
                          hint-entry (core/->HintEntry key-buf value-offset total-len now)
                          data-buf (io/encode-entry data-entry)
                          hint-buf (io/encode-hint hint-entry)]
-                     (byte-streams/transfer data-buf data)
-                     (byte-streams/transfer hint-buf hint)
+                     (doseq [buf data-buf]
+                       (.write data buf))
+                     (doseq [buf hint-buf]
+                       (.write hint buf))
                      (.put chm key keydir-value)
                      (async/close! ack-chan)
                      (recur files (+ curr-offset total-len))))
@@ -91,7 +93,17 @@
             (byte-streams/to-byte-buffers "hello")
             (byte-streams/to-byte-buffers "world"))
 
+  (core/put kd "what's up" "pussycat")
+  (byte-streams/to-string (core/get kd "what's up"))
+  (core/get kd "whats up")
+
+  (core/put kd "kv" "uno")
+  (core/put kd "kv2" "does")
+  (core/put kd "kv3" "whazzzzaaaaa")
+  (core/put kd "kv" "rewrote")
+
+  (for [k ["kv" "kv2" "kv3"]] (byte-streams/to-string (core/get kd k)))
+
   (byte-streams/to-string (core/get kd (byte-streams/to-byte-buffers "hello")))
 
-  (byte-streams/print-bytes (java.io.File ))
   )

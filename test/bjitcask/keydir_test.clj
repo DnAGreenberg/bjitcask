@@ -18,16 +18,6 @@
 (def hint (bc/->HintEntry key offset total-len now))
 (def keydir-value (bc/->KeyDirValue file value-offset (.length value) now))
 
-(def serdes
-  (reify
-    bc/SerDes
-    (bc/decode-entries [this seq-of-buffers] (seq entry))
-    (bc/decode-hints [this seq-of-buffers] (seq hint))
-    (bc/decode-entry [this seq-of-buffer] entry)
-    (bc/decode-hint [this seq-of-buffers] hint)
-    (bc/encode-entry [this entry] (identity entry))
-    (bc/encode-hint [this hint] (identity hint))))
-
 (def fs
   (reify
     bc/FileSystem
@@ -41,6 +31,6 @@
 
 (deftest put-test
   (testing "Testing put functionality."
-    (let [keydir (KeyDir fs serdes)]
+    (let [keydir (KeyDir fs)]
       (bc/put keydir key value)
       (is (= (bc/get keydir key) value)))))

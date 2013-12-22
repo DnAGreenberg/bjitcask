@@ -170,18 +170,31 @@
 
 (comment
   (mapv (fn [{:keys [key value tstamp]}]
-         (byte-streams/print-bytes key)
-         (byte-streams/print-bytes value)
-         (println (java.util.Date. (* 1000 tstamp))))
-       (decode-all-entries
-              (-> (File. "/tmp/bc.iterator.test.fold/1.bitcask.data")
-                  (RandomAccessFile. "r")
-                  (.getChannel)
-                  (.position 0)
-                  ;; TODO: limit length here
-                  (byte-streams/convert (byte-streams/seq-of ByteBuffer))
-                  )
-    ))
+          (byte-streams/print-bytes key)
+          (byte-streams/print-bytes value)
+          (println (java.util.Date. (* 1000 tstamp))))
+        (decode-all-entries
+          (-> (File. "/tmp/bc.iterator.test.fold/1.bitcask.data")
+              (RandomAccessFile. "r")
+              (.getChannel)
+              (.position 0)
+              ;; TODO: limit length here
+              (byte-streams/convert (byte-streams/seq-of ByteBuffer))
+              )
+          ))
+
+  (mapv (fn [{:keys [key value tstamp]}]
+          (byte-streams/print-bytes key)
+          (byte-streams/print-bytes value)
+          (println (java.util.Date. (* 1000 tstamp))))
+        (-> (File. "/Users/dgrnbrg/bjitcask/bctest/2.bitcask.data")
+            (RandomAccessFile. "r")
+            (.getChannel)
+            (.position 0)
+            ;; TODO: limit length here
+            (byte-streams/convert (byte-streams/seq-of ByteBuffer))
+            (decode-all-entries)
+            ))
 
   (-> (File. "/tmp/bc.iterator.test.fold/1.bitcask.hint")
       (RandomAccessFile. "r")
@@ -193,7 +206,9 @@
       clojure.pprint/pprint
       )
 
-  )
+  
+
+)
 
 (comment
   (def e1 {:key (byte-array 10) :value (byte-array 22) :tstamp 7})
