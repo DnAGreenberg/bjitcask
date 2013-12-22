@@ -28,10 +28,11 @@
   (let [suffix-len (count ".bitcask.data")
         largest-int (->> (data-files dir)
                          (map (fn [^File f]
-                                (let [n (.getPath f)]
+                                (let [n (.getName f)]
                                   (Long. (.substring n 0 (- (count n) suffix-len))))))
-                         (reduce max)
+                         (reduce max 0)
                          atom)]
+    (println "largest-int is starting at" largest-int)
     (reify core/FileSystem
       (data-files [_] (data-files dir))
       (hint-file [_ data-file]
@@ -85,8 +86,8 @@
     (fn [{:keys [crc32 tstamp key value]}]
       {:crc32 crc32
        :tstamp tstamp
-       :keysz (count key)
-       :valsz (count value)})))
+       :keysz (gloss.data.bytes.core/byte-count key)
+       :valsz (gloss.data.bytes.core/byte-count value)})))
 
 (defn bitcask-crc32
   "Takes the sequence of bitcask bytebuffers, and updates it with the proper crc32"
@@ -156,7 +157,7 @@
       {:tstamp tstamp
        :total-len total-len
        :offset offset
-       :keysz (count key)})))
+       :keysz (gloss.data.bytes.core/byte-count key)})))
 
 (defn encode-hint
   [hint]
@@ -196,6 +197,11 @@
 
 (comment
   (def e1 {:key (byte-array 10) :value (byte-array 22) :tstamp 7})
+
+  (decode-entry (encode-entry core/->Entry
+                              (byte-array 10)
+                              (byte-array 22)
+                              7))
 
   (decode-entry (encode-entry e1))
 
