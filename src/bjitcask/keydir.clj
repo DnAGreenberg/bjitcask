@@ -12,11 +12,14 @@
         put-chan (async/chan)]
     (async/go-loop [{:keys [data-file data hint] :as files} (core/create fs)
                     curr-offset 0]
-                   (let [[key value ack-chan] (async/<! put-chan)
+                   (let [{:keys [op ack-chan] :as command} (async/<! put-chan)
+                         [key value] (case op
+                                       :put [(:key command) (:value command)]
+                                       :alter ((:fun command)))
                          key-buf (-> key
                                      (byte-streams/to-byte-buffers)
                                      (gloss.io/to-buf-seq))
-                         val-buf (-> key
+                         val-buf (-> value
                                      (byte-streams/to-byte-buffers)
                                      (gloss.io/to-buf-seq))
                          key-len (gloss.data.bytes.core/byte-count key-buf) 
@@ -53,9 +56,16 @@
                                      value-len)]
           value-bytes))
       (put [_ key value] (let [ack-chan (async/chan)]
-                           (async/>!! put-chan [key value ack-chan])
+                           (async/>!! put-chan {:op :put
+                                                :key key
+                                                :value value
+                                                :ack-chan ack-chan})
                            (async/<!! ack-chan)))
-      (alter [_ fun] ()))))
+      (alter [_ fun] (let [ack-chan (async/chan)]
+                       (async/>!! put-chan {:op :alter
+                                            :fun fun
+                                            :ack-chan ack-chan})
+                       (async/<!! ack-chan))))))
 
 (comment
   (def kd (KeyDir (io/open (java.io.File. "/Users/dgrnbrg/bjitcask/bctest"))))
