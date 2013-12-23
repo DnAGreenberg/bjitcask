@@ -8,8 +8,11 @@
   (scan [fs file] [fs file offset len] "Returns a seq of byte buffers starting at offset of total length len. Defaults to scanning the whole file.")
   (create [fs] "Returns a map containing 2 keys: :data and :hint, which are each random access files."))
 
-(defprotocol File
-  (write-bufs [file seq-of-buffers] "Writes a seq of buffers to the file"))
+(defprotocol IDataWriter
+  (data-size [file] "Returns the amount of space in bytes used by the data file")
+  (append-data [file bufs] "Appends the given bufs to the associated data file. Returns false if the append failed and a new data file should be created.")
+  (append-hint [file bufs] "Appends the given bufs to the associated hint file")
+  (close [file] "Closes the file."))
 
 (defrecord Entry [key value ^long tstamp])
 (defrecord HintEntry [key ^long offset ^long total-len ^long tstamp])

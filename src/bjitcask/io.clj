@@ -8,62 +8,6 @@
            [java.nio ByteBuffer]
            [java.util Arrays]))
 
-(extend-protocol core/File
-  RandomAccessFile
-  (write-bufs [^RandomAccessFile file seq-of-buffers]
-    (doseq [buf seq-of-buffers]
-      (.write buf))))
-
-
-(defn data-files
-  [^File dir]
-  (.listFiles dir (reify FilenameFilter
-                    (accept [_ _ name]
-                      (.endsWith name ".bitcask.data")))))
-
-(defn open
-  "Takes a directory and opens the bitcask inside."
-  [^File dir]
-  (assert (.isDirectory dir) "Bitcask must be a directory")
-  (let [suffix-len (count ".bitcask.data")
-        largest-int (->> (data-files dir)
-                         (map (fn [^File f]
-                                (let [n (.getName f)]
-                                  (Long. (.substring n 0 (- (count n) suffix-len))))))
-                         (reduce max 0)
-                         atom)]
-    (println "largest-int is starting at" largest-int)
-    (reify core/FileSystem
-      (data-files [_] (data-files dir))
-      (hint-file [_ data-file]
-        (let [data-file ^File data-file
-              path (.getPath data-file)]
-          (assert (.endsWith path ".bitcask.data"))
-          (let [hint (File. (str (.substring path 0 (- (count path) 5)) "hint"))]
-            (when (.exists hint)
-              hint))))
-      (lock [_] "todo")
-      (unlock [_ forec?] "todo")
-      (scan [fs file]
-        (core/scan fs file 0 (.length file)))
-      (scan [fs file offset length]
-        (-> file
-            (RandomAccessFile. "r")
-            (.getChannel)
-            (.position offset)
-            (byte-streams/convert (byte-streams/seq-of ByteBuffer))
-            (gio/to-buf-seq)
-            (gloss.data.bytes/take-bytes length)))
-      (create [_]
-        (let [id (swap! largest-int inc)
-              data-file (File. dir (str id ".bitcask.data"))
-              hint-file (File. dir (str id ".bitcask.hint"))
-              data (.getChannel (RandomAccessFile. data-file "rw"))
-              hint (.getChannel (RandomAccessFile. hint-file "rw"))]
-          {:data data
-           :data-file data-file
-           :hint hint
-           :hint-file hint-file})))))
 
 (def ^:const page-size 4096)
 
@@ -168,6 +112,22 @@
   [buf]
   (gio/decode-all bitcask-hint buf))
 
+(defrecord DataFile [data data-file hint active-size]
+  core/IDataWriter
+  (data-size [this]
+    @active-size)
+  (append-data [this bufs]
+    (let [size (gloss.data.bytes.core/byte-count bufs)]
+      (swap! active-size + size)
+      (doseq [buf bufs]
+        (.write data buf))))
+  (append-hint [this bufs]
+    (doseq [buf bufs]
+      (.write hint buf)))
+  (close [this]
+    (.close data)
+    (.close hint)))
+
 (comment
   (mapv (fn [{:keys [key value tstamp]}]
           (byte-streams/print-bytes key)
@@ -241,3 +201,49 @@
 
   )
 
+(defn data-files
+  [^File dir]
+  (.listFiles dir (reify FilenameFilter
+                    (accept [_ _ name]
+                      (.endsWith name ".bitcask.data")))))
+
+(defn open
+  "Takes a directory and opens the bitcask inside."
+  [^File dir]
+  (assert (.isDirectory dir) "Bitcask must be a directory")
+  (let [suffix-len (count ".bitcask.data")
+        largest-int (->> (data-files dir)
+                         (map (fn [^File f]
+                                (let [n (.getName f)]
+                                  (Long. (.substring n 0 (- (count n) suffix-len))))))
+                         (reduce max 0)
+                         atom)]
+    (println "largest-int is starting at" largest-int)
+    (reify core/FileSystem
+      (data-files [_] (data-files dir))
+      (hint-file [_ data-file]
+        (let [data-file ^File data-file
+              path (.getPath data-file)]
+          (assert (.endsWith path ".bitcask.data"))
+          (let [hint (File. (str (.substring path 0 (- (count path) 5)) "hint"))]
+            (when (.exists hint)
+              hint))))
+      (lock [_] "todo")
+      (unlock [_ forec?] "todo")
+      (scan [fs file]
+        (core/scan fs file 0 (.length file)))
+      (scan [fs file offset length]
+        (-> file
+            (RandomAccessFile. "r")
+            (.getChannel)
+            (.position offset)
+            (byte-streams/convert (byte-streams/seq-of ByteBuffer))
+            (gio/to-buf-seq)
+            (gloss.data.bytes/take-bytes length)))
+      (create [_]
+        (let [id (swap! largest-int inc)
+              data-file (File. dir (str id ".bitcask.data"))
+              hint-file (File. dir (str id ".bitcask.hint"))
+              data (.getChannel (RandomAccessFile. data-file "rw"))
+              hint (.getChannel (RandomAccessFile. hint-file "rw"))]
+          (->DataFile data data-file hint (atom 0)))))))
