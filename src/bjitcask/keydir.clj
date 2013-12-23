@@ -10,7 +10,7 @@
   [fs]
   (let [chm (java.util.concurrent.ConcurrentHashMap.)
         put-chan (async/chan)]
-    (async/go-loop [{:keys [data-file data hint] :as files} (core/create fs)
+    (async/go-loop [files (core/create fs)
                     curr-offset 0]
                    (let [{:keys [op ack-chan] :as command} (async/<! put-chan)
                          [key value] (case op
@@ -30,18 +30,23 @@
                          total-len (+ key-len value-len 14)
                          ; TODO aysylu: unix time
                          now (quot (System/currentTimeMillis) 1000)
-                         keydir-value (core/->KeyDirValue data-file
+                         keydir-value (core/->KeyDirValue (:data-file files)
                                                           value-offset
                                                           value-len
                                                           now)
                          data-entry (core/->Entry key-buf val-buf now)
                          hint-entry (core/->HintEntry key-buf value-offset total-len now)
                          data-buf (io/encode-entry data-entry)
-                         hint-buf (io/encode-hint hint-entry)]
-                     (doseq [buf data-buf]
-                       (.write data buf))
-                     (doseq [buf hint-buf]
-                       (.write hint buf))
+                         hint-buf (io/encode-hint hint-entry)
+                         ;; This creates a new data file segment if the old one was full
+                         files (if (> (+ (gloss.data.bytes.core/byte-count data-buf)
+                                         (core/data-size files))
+                                      2000000000)
+                                 (do (core/close files)
+                                     (core/create fs))
+                                 files)]
+                     (core/append-data files data-buf)
+                     (core/append-hint files hint-buf)   
                      (.put chm key keydir-value)
                      (async/close! ack-chan)
                      (recur files (+ curr-offset total-len))))
