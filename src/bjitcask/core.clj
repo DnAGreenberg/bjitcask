@@ -24,6 +24,6 @@
   (encode-hint [this hint] "Writes HintEntry to a seq of buffers."))
 
 (defprotocol Bitcask
-  (get [bitcask key] "Returns the value for the key in the bitcask.")
+  (get [bitcask key] [bitcask key not-found] "Returns the value for the key in the bitcask.")
   (put [bitcask key value] "Stores the value for the given key.")
   (alter [bitcask fun] "fun must be a function that takes no arguments and returns a key-value pair to be `put`."))

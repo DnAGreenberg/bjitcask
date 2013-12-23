@@ -47,7 +47,9 @@
                      (recur files (+ curr-offset total-len))))
     (reify
       bjitcask.core.Bitcask
-      (get [_ key]
+      (get [kd key]
+        (core/get kd key nil))
+      (get [_ key not-found]
         (let [keydir-value (.get chm key)
               data-file (:file keydir-value)
               value-offset (:value-offset keydir-value)
@@ -56,7 +58,12 @@
                                      data-file
                                      value-offset
                                      value-len)]
-          value-bytes))
+          
+          (if (and #spy/d keydir-value
+                   ; TODO aysylu: refactor out the hard-coded tombstone value into config
+                   (not (byte-streams/bytes= "bitcask_tombstone" #spy/d value-bytes)))
+            value-bytes 
+            not-found)))
       (put [_ key value] (let [ack-chan (async/chan)]
                            (async/>!! put-chan {:op :put
                                                 :key key
@@ -70,7 +77,7 @@
                        (async/<!! ack-chan))))))
 
 (comment
-  (def kd (KeyDir (io/open (java.io.File. "/Users/dgrnbrg/bjitcask/bctest"))))
+  (def kd (KeyDir (io/open (java.io.File. "/Users/aysylu/bjitcask/bctest"))))
 
   (io/encode-entry 
     (core/->Entry (-> (byte-array 10)
@@ -101,6 +108,9 @@
   (core/put kd "kv2" "does")
   (core/put kd "kv3" "whazzzzaaaaa")
   (core/put kd "kv" "rewrote")
+
+  (core/put kd "dead" "bitcask_tombstone")
+  (byte-streams/to-string (core/get kd "dead" "not-found"))
 
   (for [k ["kv" "kv2" "kv3"]] (byte-streams/to-string (core/get kd k)))
 
