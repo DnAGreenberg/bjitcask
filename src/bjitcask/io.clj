@@ -68,9 +68,34 @@
     (assert (= crc32 (bit-and 0xffffffff (:crc32 entry))) "CRC32 didn't match!")
     entry))
 
+(defn decode-all-keydir-entries
+  "Turns bytes from the data-file into a sequence of KeyDirEntries."
+  [data-file]
+  (let [bytes (byte-streams/convert data-file) 
+        decode-next (#'gio/decoder bitcask-entry)]
+    (binding [gloss.core.protocols/complete? true]
+      (loop [buf-seq (gio/to-buf-seq bytes)
+             keydir-entries []
+             curr-offset 0]
+        (if-let [[entry remainder] (decode-next buf-seq)]
+          (let [crc32 (bitcask-crc32 buf-seq)
+                key (:key entry)
+                tstamp (:tstamp entry)
+                keysz (gloss.data.bytes.core/byte-count key)
+                valsz (gloss.data.bytes.core/byte-count (:value entry))
+                entry-len (+ 14 keysz valsz) 
+                value-offset (+ curr-offset keysz)
+                keydir-entry (core/->KeyDirEntry key
+                                                 data-file
+                                                 value-offset
+                                                 valsz
+                                                 tstamp)]
+            (assert (= crc32 (bit-and 0xffffffff (:crc32 entry))))
+            (recur remainder (conj keydir-entries keydir-entry) (+ curr-offset entry-len)))
+          keydir-entries)))))
+
 (defn decode-all-entries
-  "Turns bytes into a sequence of frame values.  If there are bytes left over at the end
-   of the sequence, an exception is thrown."
+  "Turns bytes into a sequence of Entries."
   [bytes]
   (let [decode-next (#'gio/decoder bitcask-entry)]
     (binding [gloss.core.protocols/complete? true]
