@@ -109,7 +109,8 @@
           data-files (sort-by #(.lastModified %) (core/data-files fs))]
      (->> data-files
           (mapcat (partial list-keydir-entries fs))
-          (reduce (fn [chm entry] (doto chm (.put (:key entry) entry)))
+          (reduce (fn [chm entry] (doto chm
+                                    (.put (byte-streams/to-string (:key entry)) entry)))
                   chm))))
 
 (comment
