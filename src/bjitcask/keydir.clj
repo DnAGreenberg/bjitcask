@@ -170,6 +170,6 @@
 
   (bjitcask.core/keydir (:keydir my-bc))
 
-  (time (process-bitcask my-bc))
+  (time (bjitcask.merge/process-bitcask my-bc))
 
   )

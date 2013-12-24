@@ -44,7 +44,8 @@
         data-buf (bjitcask.io/encode-entry {:key key
                                             :value value-bufs
                                             :tstamp tstamp})
-        hint-buf (bjitcask.io/encode-hint {:file file
+        hint-buf (bjitcask.io/encode-hint {:key key
+                                           :file file
                                            :offset (- value-offset
                                                       14
                                                       key-len)
