@@ -16,15 +16,7 @@
 
 (defrecord Entry [key value ^long tstamp])
 (defrecord HintEntry [key ^long offset ^long total-len ^long tstamp])
-(defrecord KeyDirValue [file ^long value-offset ^long value-len ^long tstamp])
-
-(defprotocol SerDes
-  (decode-entries [this seq-of-buffers] "Returns a seq of Entries.")
-  (decode-hints [this seq-of-buffers] "Retunrs a seq of HintEntries.")
-  (decode-entry [this seq-of-buffers] "Returns an Entry.")
-  (decode-hint [this seq-of-buffers] "Returns a HintEntry.")
-  (encode-entry [this entry] "Writes Entry to a seq of buffers.")
-  (encode-hint [this hint] "Writes HintEntry to a seq of buffers."))
+(defrecord KeyDirEntry [key file ^long value-offset ^long value-len ^long tstamp])
 
 (defprotocol Bitcask
   (get [bitcask key] [bitcask key not-found] "Returns the value for the key in the bitcask.")
