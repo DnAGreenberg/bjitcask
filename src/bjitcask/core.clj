@@ -19,6 +19,7 @@
 (defrecord KeyDirEntry [key file ^long value-offset ^long value-len ^long tstamp])
 
 (defprotocol Bitcask
+  (keydir [bitcask] "Returns a snapshot of the keydir")
   (get [bitcask key] [bitcask key not-found] "Returns the value for the key in the bitcask.")
   (put [bitcask key value] "Stores the value for the given key.")
   (alter [bitcask fun] "fun must be a function that takes no arguments and returns a key-value pair to be `put`."))

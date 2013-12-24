@@ -42,7 +42,7 @@
                          ;; This creates a new data file segment if the old one was full
                          files (if (> (+ (gloss.data.bytes.core/byte-count data-buf)
                                          (core/data-size files))
-                                      2000000000)
+                                      10000)
                                  (do (core/close files)
                                      (core/create fs))
                                  files)]
@@ -53,6 +53,8 @@
                      (recur files (+ curr-offset total-len))))
     (reify
       bjitcask.core.Bitcask
+      (keydir [kd]
+        (into {} chm))
       (get [kd key]
         (core/get kd key nil))
       (get [_ key not-found]
