@@ -233,6 +233,12 @@
                     (accept [_ _ name]
                       (.endsWith name ".bitcask.data")))))
 
+(defn hint-files
+  [^File dir]
+  (.listFiles dir (reify FilenameFilter
+                    (accept [_ _ name]
+                      (.endsWith name ".bitcask.hint")))))
+
 (defn open
   "Takes a directory and opens the bitcask inside."
   [^File dir]
@@ -247,6 +253,7 @@
     (println "largest-int is starting at" largest-int)
     (reify core/FileSystem
       (data-files [_] (data-files dir))
+      (hint-files [_] (hint-files dir))
       (hint-file [_ data-file]
         (let [data-file ^File data-file
               path (.getPath data-file)]

@@ -2,6 +2,7 @@
 
 (defprotocol FileSystem
   (data-files [fs] "Returns collection of all data files in the bitcask")
+  (hint-files [fs] "Returns collection of all hint files in the bitcask")
   (hint-file [fs data-file] "Returns the hint file associated with the data-file if it exists; otherwise, return nil")
   (lock [fs] "Locks the bitcask on the file system")
   (unlock [fs force?] "Unlocks the bitcask on the filesystem.")
