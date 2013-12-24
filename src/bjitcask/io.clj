@@ -251,7 +251,7 @@
         (let [data-file ^File data-file
               path (.getPath data-file)]
           (assert (.endsWith path ".bitcask.data"))
-          (let [hint (File. (str (.substring path 0 (- (count path) 5)) "hint"))]
+          (let [hint (File. (str (.substring path 0 (- (count path) 4)) "hint"))]
             (when (.exists hint)
               hint))))
       (lock [_] "todo")

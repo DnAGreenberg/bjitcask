@@ -69,22 +69,37 @@
     (doseq [file stale-files]
       (.delete file))
     (loop [[entry & entries] entries
-           file (bjitcask.core/create (:fs bc))]
+           file (bjitcask.core/create (:fs bc))
+           curr-offset 0]
       (when entry
         (let [[data-buf hint-buf] (get-bufs-from-keydir-entry (:fs bc) entry)
               ;; This creates a new data file segment if the old one was full
-              file (if (> (+ (gloss.data.bytes.core/byte-count data-buf)
-                              (bjitcask.core/data-size file))
-                           10000)
-                      (do (bjitcask.core/close file)
-                          (println "Rollover")
-                          (bjitcask.core/create (:fs bc)))
-                      file)] 
+              [file curr-offset]
+              (if (> (+ (gloss.data.bytes.core/byte-count data-buf)
+                        (bjitcask.core/data-size file))
+                     10000)
+                (do (bjitcask.core/close file)
+                    (println "Rollover")
+                    [(bjitcask.core/create (:fs bc)) 0])
+                [file curr-offset])
+              key-len (gloss.data.bytes.core/byte-count
+                        (gloss.io/to-buf-seq
+                          (byte-streams/to-byte-buffers
+                            (:entry key))))
+              value-offset (+ curr-offset 14 key-len)
+              kde (bjitcask.core/->KeyDirEntry (:key entry)
+                                               (:data-file file)
+                                               value-offset
+                                               (:value-len entry)
+                                               (:tstamp entry))] 
           (bjitcask.core/append-data file data-buf)
           (bjitcask.core/append-hint file hint-buf)
+          (bjitcask.core/inject (:keydir bc) (:key kde) kde)
           (print ".")
-          (recur entries file))))
+          (recur entries file (+ curr-offset 14 key-len (:value-len entry))))))
     (doseq [[file] kd-yield]
+      (when-let [hint (bjitcask.core/hint-file (:fs bc) file)]
+        (.delete hint))
       (.delete file))
     (println "Compacting" (count entries) "entries")))
 
@@ -98,6 +113,9 @@
                              (byte-array  (rand-int 200)))))
 
   (bjitcask.core/get (:keydir my-bc) "test177")
+  (get (bjitcask.core/keydir (:keydir my-bc)) "test177")
+
+  (map (partial bjitcask.core/hint-file (:fs my-bc)) (bjitcask.core/data-files (:fs my-bc)))
 
   (time (process-bitcask my-bc))
 

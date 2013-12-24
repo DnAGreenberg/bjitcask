@@ -56,6 +56,8 @@
       bjitcask.core.Bitcask
       (keydir [kd]
         (into {} chm))
+      (inject [kd k kde]
+        (.put chm k kde))
       (get [kd key]
         (core/get kd key nil))
       (get [_ key not-found]
@@ -88,7 +90,7 @@
 (defn hint->keydir-entry
   "Convert hints in the hint file to KeyDirEntries."
   [fs data-file hint-file]
-  (map (fn [key offset total-len tstamp]
+  (map (fn [{:keys [key offset total-len tstamp]}]
          (let [value-len (- total-len 14 (gloss.data.bytes.core/byte-count key))]
            (core/->KeyDirEntry key data-file offset value-len tstamp)))
        (io/decode-all-hints (core/scan fs hint-file))))
