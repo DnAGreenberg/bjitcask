@@ -259,13 +259,18 @@
       (scan [fs file]
         (core/scan fs file 0 (.length file)))
       (scan [fs file offset length]
-        (-> file
-            (RandomAccessFile. "r")
-            (.getChannel)
-            (.position offset)
-            (byte-streams/convert (byte-streams/seq-of ByteBuffer))
-            (gio/to-buf-seq)
-            (gloss.data.bytes/take-bytes length)))
+        (let [channel
+              (-> file
+                  (RandomAccessFile. "r")
+                  (.getChannel))
+              bytes
+              (-> channel
+                  (.position offset)
+                  (byte-streams/convert (byte-streams/seq-of ByteBuffer))
+                  (gio/to-buf-seq)
+                  (gloss.data.bytes/take-bytes length))]
+          (.close channel)
+          bytes))
       (create [_]
         (let [id (swap! largest-int inc)
               data-file (File. dir (str id ".bitcask.data"))

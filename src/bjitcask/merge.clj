@@ -1,5 +1,6 @@
 (ns bjitcask.merge
-  (:require [bjitcask core io keydir])
+  (:require [bjitcask core io keydir]
+            byte-streams)
   (:import java.io.File))
 
 
@@ -15,7 +16,9 @@
               [file [(reduce (fn [total entry]
                                (+ total
                                   14
-                                  (gloss.data.bytes.core/byte-count (:key entry))
+                                  (gloss.data.bytes.core/byte-count
+                                    (gloss.data.bytes.core/create-buf-seq
+                                      (byte-streams/to-byte-buffers (:key entry))))
                                   (:value-len entry)))
                              0
                              entries)
@@ -35,6 +38,8 @@
                                        file
                                        value-offset
                                        value-len)
+        key (gloss.data.bytes.core/create-buf-seq
+              (byte-streams/to-byte-buffers key))
         key-len (gloss.data.bytes.core/byte-count key)
         data-buf (bjitcask.io/encode-entry {:key key
                                             :value value-bufs
@@ -79,6 +84,8 @@
           (bjitcask.core/append-hint file hint-buf)
           (print ".")
           (recur entries file))))
+    (doseq [[file] kd-yield]
+      (.delete file))
     (println "Compacting" (count entries) "entries")))
 
 (comment
@@ -90,7 +97,7 @@
                              (rand-nth sample-set)
                              (byte-array  (rand-int 200)))))
 
-  (bjitcask.core/keydir (:keydir my-bc))
+  (bjitcask.core/get (:keydir my-bc) "test177")
 
   (time (process-bitcask my-bc))
 
