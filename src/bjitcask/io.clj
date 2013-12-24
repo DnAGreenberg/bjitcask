@@ -92,6 +92,7 @@
   (gloss/header
     bitcask-hint-header
     (fn [{:keys [tstamp keysz total-len offset]}]
+      ;;TODO: compiling here might be very slow
       (gloss/compile-frame (gloss/ordered-map
                              :tstamp tstamp
                              :total-len total-len
