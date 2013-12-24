@@ -1,5 +1,6 @@
 (ns bjitcask.registry
-  (:require [bjitcask core keydir io]
+  (:require [bjitcask core keydir io merge]
+            [clojure.core.async :as async]
             [clojure.java.io]))
 
 (def registry-atom (atom {}))
@@ -17,5 +18,9 @@
             init-dir (bjitcask.keydir/init fs)
             keydir (bjitcask.keydir/KeyDir fs init-dir)
             bc {:fs fs :keydir keydir :dir dir}]
+        (async/go
+          (while true
+            (async/<! (async/timeout (* 5 60 1000)))
+            (bjitcask.merge/process-bitcask bc)))
         (swap! registry-atom assoc dir bc)
         bc))))
