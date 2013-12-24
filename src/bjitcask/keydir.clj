@@ -7,8 +7,8 @@
 
 (defn KeyDir
   ""
-  [fs]
-  (let [chm (java.util.concurrent.ConcurrentHashMap.)
+  [fs init-dir]
+  (let [chm (java.util.concurrent.ConcurrentHashMap. init-dir)
         put-chan (async/chan)]
     (async/go-loop [files (core/create fs)
                     curr-offset 0]
@@ -30,7 +30,8 @@
                          total-len (+ key-len value-len 14)
                          ; TODO aysylu: unix time
                          now (quot (System/currentTimeMillis) 1000)
-                         keydir-value (core/->KeyDirValue (:data-file files)
+                         keydir-value (core/->KeyDirValue key
+                                                          (:data-file files)
                                                           value-offset
                                                           value-len
                                                           now)
@@ -80,6 +81,33 @@
                                             :fun fun
                                             :ack-chan ack-chan})
                        (async/<!! ack-chan))))))
+
+(defn hint->keydir-entry
+  "Convert hints in the hint file to KeyDirEntries."
+  [fs data-file hint-file]
+  (map (fn [key offset total-len tstamp]
+         (let [value-len (- total-len 14 (gloss.data.bytes.core/byte-count key))]
+           (core/->KeyDirEntry key data-file offset value-len tstamp)))
+       (io/decode-all-hints (core/scan fs hint-file))))
+
+(defn list-keydir-entries
+  "Returns keydir entries for the data or hint file, if present."
+  [fs data-file]
+  (let [hint-file (core/hint-file fs data-file)]
+    (if hint-file
+      (hint->keydir-entry fs data-file hint-file)
+      (io/decode-all-keydir-entries data-file))))
+
+(defn init
+  ""
+  [fs]
+   (let  [chm (java.util.HashMap.)
+          ; data files in order from oldest first
+          data-files (sort-by #(.lastModified %) (core/data-files fs))]
+     (->> data-files
+          (mapcat (list-keydir-entries fs))
+          (reduce (fn [chm entry] (doto chm (.put (:key entry) entry)))
+                  chm))))
 
 (comment
   (def kd (KeyDir (io/open (java.io.File. "/Users/aysylu/bjitcask/bctest"))))

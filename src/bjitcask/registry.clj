@@ -24,7 +24,8 @@
     (if-let [bc (get @registry-atom dir)]
       bc
       (let [fs (bjitcask.io/open dir)
-            keydir (bjitcask.keydir/KeyDir fs)
+            init-dir (init fs)
+            keydir (bjitcask.keydir/KeyDir fs init-dir)
             bc (->Bitcask fs keydir dir)]
         (swap! registry-atom assoc dir bc)
         bc))))
