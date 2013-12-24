@@ -30,7 +30,7 @@
                          total-len (+ key-len value-len 14)
                          ; TODO aysylu: unix time
                          now (quot (System/currentTimeMillis) 1000)
-                         keydir-value (core/->KeyDirValue key
+                         keydir-value (core/->KeyDirEntry key
                                                           (:data-file files)
                                                           value-offset
                                                           value-len
@@ -40,12 +40,13 @@
                          data-buf (io/encode-entry data-entry)
                          hint-buf (io/encode-hint hint-entry)
                          ;; This creates a new data file segment if the old one was full
-                         files (if (> (+ (gloss.data.bytes.core/byte-count data-buf)
+                         [files curr-offset]
+                         (if (> (+ (gloss.data.bytes.core/byte-count data-buf)
                                          (core/data-size files))
                                       10000)
                                  (do (core/close files)
-                                     (core/create fs))
-                                 files)]
+                                     [(core/create fs) 0])
+                                 [files curr-offset])]
                      (core/append-data files data-buf)
                      (core/append-hint files hint-buf)   
                      (.put chm key keydir-value)
@@ -67,9 +68,9 @@
                                      value-offset
                                      value-len)]
           
-          (if (and #spy/d keydir-value
+          (if (and keydir-value
                    ; TODO aysylu: refactor out the hard-coded tombstone value into config
-                   (not (byte-streams/bytes= "bitcask_tombstone" #spy/d value-bytes)))
+                   (not (byte-streams/bytes= "bitcask_tombstone" value-bytes)))
             value-bytes 
             not-found)))
       (put [_ key value] (let [ack-chan (async/chan)]
@@ -107,7 +108,7 @@
           ; data files in order from oldest first
           data-files (sort-by #(.lastModified %) (core/data-files fs))]
      (->> data-files
-          (mapcat (list-keydir-entries fs))
+          (mapcat (partial list-keydir-entries fs))
           (reduce (fn [chm entry] (doto chm (.put (:key entry) entry)))
                   chm))))
 
@@ -150,5 +151,22 @@
   (for [k ["kv" "kv2" "kv3"]] (byte-streams/to-string (core/get kd k)))
 
   (byte-streams/to-string (core/get kd (byte-streams/to-byte-buffers "hello")))
+
+  )
+
+(comment
+  (def my-bc  (bjitcask.registry/open "/Users/aysylu/test-bc"))
+
+  (def sample-set  (map #(str "test" %)  (range 1000)))
+  (time (dotimes [i 10000]
+          (bjitcask.core/put (:keydir my-bc)
+                             (rand-nth sample-set)
+                             (byte-array  (rand-int 200)))))
+
+  (core/get (:keydir my-bc) "test22")
+
+  (bjitcask.core/keydir (:keydir my-bc))
+
+  (time (process-bitcask my-bc))
 
   )

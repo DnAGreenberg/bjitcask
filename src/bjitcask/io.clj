@@ -71,7 +71,7 @@
 (defn decode-all-keydir-entries
   "Turns bytes from the data-file into a sequence of KeyDirEntries."
   [data-file]
-  (let [bytes (byte-streams/convert data-file) 
+  (let [bytes (byte-streams/to-byte-buffers data-file) 
         decode-next (#'gio/decoder bitcask-entry)]
     (binding [gloss.core.protocols/complete? true]
       (loop [buf-seq (gio/to-buf-seq bytes)
