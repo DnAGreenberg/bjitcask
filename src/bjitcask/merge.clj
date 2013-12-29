@@ -99,8 +99,11 @@
           (print ".")
           (recur entries file (+ curr-offset 14 key-len (:value-len entry))))))
     (doseq [[file] kd-yield]
-      (when-let [hint (bjitcask.core/hint-file (:fs bc) file)]
-        (.delete hint))
+      (.delete file))
+    (doseq [file (->> (bjitcask.core/hint-files (:fs bc))
+                      (remove (->> (bjitcask.core/data-files (:fs bc))
+                                   (map #(bjitcask.core/hint-file (:fs bc) %))
+                                   (set))))]
       (.delete file))
     (println "Compacting" (count entries) "entries")))
 
