@@ -24,3 +24,43 @@
   (get [bitcask key] [bitcask key not-found] "Returns the value for the key in the bitcask.")
   (put [bitcask key value] "Stores the value for the given key.")
   (alter [bitcask fun] "fun must be a function that takes no arguments and returns a key-value pair to be `put`."))
+
+;;;; Global Vars
+;page size
+;
+;;;; Global structures
+; entry {:tstamp :key :value}
+; hint {:tsamp :key :total-len :offset}
+; keydirentry {:key :file :value-offset :value-len :tstamp}
+;;;; Global functions
+;; DataFile
+; - data-size (space used in data file)
+; - append-data (these distinguish streams)
+; - append-hint (these distinguish streams)
+; - close
+;
+;; Codecs
+; - decode-all-*
+; - encode-*
+;
+;; Filesystem (created by open)
+; - data-files (discover)
+; - hint file (find companion)
+; - scan (read)
+; - create (write, a datafile)
+;
+;; Bitcask
+; - keydir (returns chm)
+; - inject (seeding the keydir)
+; - get
+; - put
+; - alter
+; - init (takes fs -> seeds chm)
+;
+;; Merge
+; - process (uses fs, codec, and keydir APIs)
+;
+;; Registry
+; - open (uses fs, keydir, merge)
+;
+; TODO: use records instead of maps everywhere
