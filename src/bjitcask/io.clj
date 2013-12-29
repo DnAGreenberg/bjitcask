@@ -22,11 +22,11 @@
   (gloss/header
     bitcask-entry-header
     (fn [{:keys [crc32 tstamp keysz valsz]}]
-      (gloss/compile-frame (gloss/ordered-map
-                             :crc32 crc32
-                             :tstamp tstamp
-                             :key (gloss/finite-block keysz)
-                             :value (gloss/finite-block valsz))))
+      (gloss/ordered-map
+        :crc32 crc32
+        :tstamp tstamp
+        :key (gloss/finite-block keysz)
+        :value (gloss/finite-block valsz)))
     (fn [{:keys [crc32 tstamp key value]}]
       {:crc32 crc32
        :tstamp tstamp
@@ -118,11 +118,11 @@
     bitcask-hint-header
     (fn [{:keys [tstamp keysz total-len offset]}]
       ;;TODO: compiling here might be very slow
-      (gloss/compile-frame (gloss/ordered-map
-                             :tstamp tstamp
-                             :total-len total-len
-                             :offset offset
-                             :key (gloss/finite-block keysz))))
+      (gloss/ordered-map
+        :tstamp tstamp
+        :total-len total-len
+        :offset offset
+        :key (gloss/finite-block keysz)))
     (fn [{:keys [tstamp total-len offset key]}]
       {:tstamp tstamp
        :total-len total-len
