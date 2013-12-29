@@ -112,6 +112,9 @@
           (bjitcask.core/put (:keydir my-bc)
                              (rand-nth sample-set)
                              (byte-array  (rand-int 200)))))
+  (time (dotimes [i 10000]
+          (bjitcask.core/get (:keydir my-bc)
+                             (rand-nth sample-set))))
 
   (bjitcask.core/get (:keydir my-bc) "test177")
   (get (bjitcask.core/keydir (:keydir my-bc)) "test177")
