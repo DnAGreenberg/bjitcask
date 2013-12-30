@@ -32,6 +32,13 @@
             :let [v (bjitcask.core/get (:keydir my-bc) k)]]
       (is v (str "Key " k  " is nil"))
       (is (<= (gloss.data.bytes.core/byte-count v) max-byte-array-sz)))
+
+    (bjitcask.merge/process-bitcask my-bc)
+    (doseq [k sample-set
+            :let [v (bjitcask.core/get (:keydir my-bc) k)]]
+      (is v (str "Key " k  " is nil"))
+      (is (<= (gloss.data.bytes.core/byte-count v) max-byte-array-sz)))
+
     (bjitcask.registry/close my-bc)
     (let [my-bc (bjitcask.registry/open "test-bc")]
       (doseq [k sample-set
