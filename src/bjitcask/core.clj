@@ -24,7 +24,8 @@
   (inject [bitcask key keydir-entry] "Injects a KeyDirEntry directly into the keydir.")
   (get [bitcask key] [bitcask key not-found] "Returns the value for the key in the bitcask.")
   (put [bitcask key value] "Stores the value for the given key.")
-  (alter [bitcask fun] "fun must be a function that takes no arguments and returns a key-value pair to be `put`."))
+  (alter [bitcask fun] "fun must be a function that takes no arguments and returns a key-value pair to be `put`.")
+  (close! [bitcask] "Freeze all resources associated with the Bitcask."))
 
 ;;;; Global Vars
 ;page size

@@ -9,49 +9,57 @@
   ""
   [fs init-dir]
   (let [chm (java.util.concurrent.ConcurrentHashMap. init-dir)
-        put-chan (async/chan)]
-    (async/go-loop [files (core/create fs)
-                    curr-offset 0]
-                   (let [{:keys [op ack-chan] :as command} (async/<! put-chan)
-                         [key value] (case op
-                                       :put [(:key command) (:value command)]
-                                       :alter ((:fun command)))
-                         key-buf (-> key
-                                     (byte-streams/to-byte-buffers)
-                                     (gloss.io/to-buf-seq))
-                         val-buf (-> value
-                                     (byte-streams/to-byte-buffers)
-                                     (gloss.io/to-buf-seq))
-                         key-len (gloss.data.bytes.core/byte-count key-buf) 
-                         value-len (gloss.data.bytes.core/byte-count val-buf)
-                         ; TODO aysylu: refactor the hardcoded 14 bytes into
-                         ; global header length variable
-                         value-offset (+ curr-offset 14 key-len)
-                         total-len (+ key-len value-len 14)
-                         ; TODO aysylu: unix time
-                         now (quot (System/currentTimeMillis) 1000)
-                         keydir-value (core/->KeyDirEntry key
-                                                          (:data-file files)
-                                                          value-offset
-                                                          value-len
-                                                          now)
-                         data-entry (core/->Entry key-buf val-buf now)
-                         hint-entry (core/->HintEntry key-buf value-offset total-len now)
-                         data-buf (io/encode-entry data-entry)
-                         hint-buf (io/encode-hint hint-entry)
-                         ;; This creates a new data file segment if the old one was full
-                         [files curr-offset]
-                         (if (> (+ (gloss.data.bytes.core/byte-count data-buf)
-                                         (core/data-size files))
-                                      10000)
-                                 (do (core/close files)
-                                     [(core/create fs) 0])
-                                 [files curr-offset])]
-                     (core/append-data files data-buf)
-                     (core/append-hint files hint-buf)   
-                     (.put chm key keydir-value)
-                     (async/close! ack-chan)
-                     (recur files (+ curr-offset total-len))))
+        put-chan (async/chan)
+        stop-chan (async/chan)]
+    (async/go
+      (loop [files (core/create fs)
+             curr-offset 0]
+        (async/alt!
+          stop-chan ([_]
+                     (async/close! put-chan)
+                     (recur files curr-offset))
+          put-chan ([{:keys [op ack-chan] :as command}]
+                    (if command
+                      (let [[key value] (case op
+                                          :put [(:key command) (:value command)]
+                                          :alter ((:fun command)))
+                            key-buf (-> key
+                                        (byte-streams/to-byte-buffers)
+                                        (gloss.io/to-buf-seq))
+                            val-buf (-> value
+                                        (byte-streams/to-byte-buffers)
+                                        (gloss.io/to-buf-seq))
+                            key-len (gloss.data.bytes.core/byte-count key-buf) 
+                            value-len (gloss.data.bytes.core/byte-count val-buf)
+                            ; TODO aysylu: refactor the hardcoded 14 bytes into
+                            ; global header length variable
+                            total-len (+ key-len value-len 14)
+                            ; TODO aysylu: unix time
+                            now (quot (System/currentTimeMillis) 1000)
+                            ;; This creates a new data file segment if the old one was full
+                            [files curr-offset]
+                            (if (> (+ 14 key-len value-len
+                                      (core/data-size files))
+                                   10000)
+                              (do (core/close files)
+                                  [(core/create fs) 0])
+                              [files curr-offset]) 
+                            value-offset (+ curr-offset 14 key-len)
+                            keydir-entry (core/->KeyDirEntry key
+                                                             (:data-file files)
+                                                             value-offset
+                                                             value-len
+                                                             now)
+                            data-entry (core/->Entry key-buf val-buf now)
+                            hint-entry (core/->HintEntry key-buf value-offset total-len now)
+                            data-buf (io/encode-entry data-entry)
+                            hint-buf (io/encode-hint hint-entry)]
+                        (core/append-data files data-buf)
+                        (core/append-hint files hint-buf)   
+                        (.put chm key keydir-entry)
+                        (async/close! ack-chan)
+                        (recur files (+ curr-offset total-len))) 
+                      (core/close files))))))
     (reify
       bjitcask.core.Bitcask
       (keydir [kd]
@@ -69,7 +77,7 @@
                                      data-file
                                      value-offset
                                      value-len)]
-          
+
           (if (and keydir-value
                    ; TODO aysylu: refactor out the hard-coded tombstone value into config
                    (not (byte-streams/bytes= "bitcask_tombstone" value-bytes)))
@@ -85,7 +93,8 @@
                        (async/>!! put-chan {:op :alter
                                             :fun fun
                                             :ack-chan ack-chan})
-                       (async/<!! ack-chan))))))
+                       (async/<!! ack-chan)))
+      (close! [_] (async/close! stop-chan)))))
 
 (defn hint->keydir-entry
   "Convert hints in the hint file to KeyDirEntries."
@@ -106,14 +115,14 @@
 (defn init
   ""
   [fs]
-   (let  [chm (java.util.HashMap.)
-          ; data files in order from oldest first
-          data-files (sort-by #(.lastModified %) (core/data-files fs))]
-     (->> data-files
-          (mapcat (partial list-keydir-entries fs))
-          (reduce (fn [chm entry] (doto chm
-                                    (.put (byte-streams/to-string (:key entry)) entry)))
-                  chm))))
+  (let  [chm (java.util.HashMap.)
+         ; data files in order from oldest first
+         data-files (sort-by #(.lastModified %) (core/data-files fs))]
+    (->> data-files
+         (mapcat (partial list-keydir-entries fs))
+         (reduce (fn [chm entry] (doto chm
+                                   (.put (byte-streams/to-string (:key entry)) entry)))
+                 chm))))
 
 (comment
   (def kd (KeyDir (io/open (java.io.File. "/Users/aysylu/bjitcask/bctest"))))
@@ -158,7 +167,7 @@
   )
 
 (comment
-  (def my-bc  (bjitcask.registry/open "/Users/aysylu/test-bc"))
+  (def my-bc  (bjitcask.registry/open "test-bc"))
 
   (def sample-set  (map #(str "test" %)  (range 1000)))
   (time (dotimes [i 10000]
@@ -170,7 +179,8 @@
           (bjitcask.core/get (:keydir my-bc)
                              (rand-nth sample-set))))
 
-  (core/get (:keydir my-bc) "test22")
+  (sort-by first (core/keydir (:keydir my-bc)))
+  (core/get (:keydir my-bc) "test79")
 
   (bjitcask.core/keydir (:keydir my-bc))
 

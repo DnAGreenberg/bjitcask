@@ -17,10 +17,20 @@
       (let [fs (bjitcask.io/open dir)
             init-dir (bjitcask.keydir/init fs)
             keydir (bjitcask.keydir/KeyDir fs init-dir)
-            bc {:fs fs :keydir keydir :dir dir}]
+            stop-merge-chan (async/chan)
+            bc {:fs fs :keydir keydir :dir dir :stop-merge stop-merge-chan}]
         (async/go
-          (while true
-            (async/<! (async/timeout (* 5 60 1000)))
-            (bjitcask.merge/process-bitcask bc)))
+          (loop [merge-chan (async/timeout (* 5 60 1000))]
+            (async/alt!
+              stop-merge-chan ([_] nil)
+              merge-chan ([_]
+                          (bjitcask.merge/process-bitcask bc)
+                         (recur (async/timeout (* 5 60 1000)))))))
         (swap! registry-atom assoc dir bc)
         bc))))
+
+(defn close
+  [bc]
+  (swap! registry-atom dissoc (:dir bc))
+  (async/close! (:stop-merge bc))
+  (bjitcask.core/close! (:keydir bc)))
