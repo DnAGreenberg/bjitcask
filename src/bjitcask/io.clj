@@ -20,7 +20,8 @@
   (append-hint [this bufs]
     (doseq [buf bufs]
       (.write hint buf)))
-  (close [this]
+  core/IClose
+  (close! [this]
     (.close data)
     (.close hint)))
 

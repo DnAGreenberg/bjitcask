@@ -35,7 +35,7 @@
                             (if (> (+ core/header-size key-len value-len
                                       (core/data-size files))
                                    10000)
-                              (do (core/close files)
+                              (do (core/close! files)
                                   [(core/create fs) 0])
                               [files curr-offset]) 
                             value-offset (+ curr-offset core/header-size key-len)
@@ -53,7 +53,7 @@
                         (.put chm key keydir-entry)
                         (async/close! ack-chan)
                         (recur files (+ curr-offset total-len))) 
-                      (core/close files))))))
+                      (core/close! files))))))
     (reify
       bjitcask.core.Bitcask
       (keydir [kd]
@@ -88,6 +88,7 @@
                                             :fun fun
                                             :ack-chan ack-chan})
                        (async/<!! ack-chan)))
+      core/IClose
       (close! [_] (async/close! stop-chan)))))
 
 (defn hint->keydir-entry

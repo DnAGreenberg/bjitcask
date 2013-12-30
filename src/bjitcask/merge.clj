@@ -80,7 +80,7 @@
               (if (> (+ (codecs/byte-count data-buf)
                         (bjitcask.core/data-size file))
                      10000)
-                (do (bjitcask.core/close file)
+                (do (bjitcask.core/close! file)
                     (println "Rollover")
                     [(bjitcask.core/create (:fs bc)) 0])
                 [file curr-offset])

@@ -15,8 +15,7 @@
 (defprotocol IDataWriter
   (data-size [file] "Returns the amount of space in bytes used by the data file")
   (append-data [file bufs] "Appends the given bufs to the associated data file. Returns false if the append failed and a new data file should be created.")
-  (append-hint [file bufs] "Appends the given bufs to the associated hint file")
-  (close [file] "Closes the file."))
+  (append-hint [file bufs] "Appends the given bufs to the associated hint file"))
 
 (defrecord Entry [key value ^long tstamp])
 (defrecord HintEntry [key ^long offset ^long total-len ^long tstamp])
@@ -27,8 +26,10 @@
   (inject [bitcask key keydir-entry] "Injects a KeyDirEntry directly into the keydir.")
   (get [bitcask key] [bitcask key not-found] "Returns the value for the key in the bitcask.")
   (put [bitcask key value] "Stores the value for the given key.")
-  (alter [bitcask fun] "fun must be a function that takes no arguments and returns a key-value pair to be `put`.")
-  (close! [bitcask] "Freeze all resources associated with the Bitcask."))
+  (alter [bitcask fun] "fun must be a function that takes no arguments and returns a key-value pair to be `put`."))
+
+(defprotocol IClose
+  (close! [this] "Shuts down gracefully and frees all resources associated with this."))
 
 ;;;; Global Vars DONE
 ; page size
@@ -69,4 +70,6 @@
 ;; Registry
 ; - open (uses fs, keydir, merge)
 ;
+; Closeable protocol
+; - close!
 ; TODO: use records instead of maps everywhere
