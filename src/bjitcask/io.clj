@@ -2,6 +2,7 @@
   (:require [bjitcask.core :as core]
             [gloss.core :as gloss]
             [gloss.io :as gio]
+            [bjitcask.bytes :as bytes]
             [clojure.core.async :as async]
             byte-streams)
   (:import [java.io RandomAccessFile File FilenameFilter]
@@ -30,8 +31,8 @@
     (fn [{:keys [crc32 tstamp key value]}]
       {:crc32 crc32
        :tstamp tstamp
-       :keysz (gloss.data.bytes.core/byte-count key)
-       :valsz (gloss.data.bytes.core/byte-count value)})))
+       :keysz (bytes/byte-count key)
+       :valsz (bytes/byte-count value)})))
 
 (defn bitcask-crc32
   "Takes the sequence of bitcask bytebuffers, and updates it with the proper crc32"
@@ -81,8 +82,8 @@
           (let [crc32 (bitcask-crc32 buf-seq)
                 key (:key entry)
                 tstamp (:tstamp entry)
-                keysz (gloss.data.bytes.core/byte-count key)
-                valsz (gloss.data.bytes.core/byte-count (:value entry))
+                keysz (bytes/byte-count key)
+                valsz (bytes/byte-count (:value entry))
                 entry-len (+ 14 keysz valsz) 
                 value-offset (+ curr-offset keysz)
                 keydir-entry (core/->KeyDirEntry key
@@ -127,7 +128,7 @@
       {:tstamp tstamp
        :total-len total-len
        :offset offset
-       :keysz (gloss.data.bytes.core/byte-count key)})))
+       :keysz (bytes/byte-count key)})))
 
 (defn encode-hint
   [hint]
@@ -143,7 +144,7 @@
   (data-size [this]
     @active-size)
   (append-data [this bufs]
-    (let [size (gloss.data.bytes.core/byte-count bufs)]
+    (let [size (bytes/byte-count bufs)]
       (swap! active-size + size)
       (doseq [buf bufs]
         (.write data buf))))

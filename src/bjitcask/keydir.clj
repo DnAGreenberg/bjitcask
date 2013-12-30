@@ -2,7 +2,7 @@
   (:require [bjitcask.core :as core]
             byte-streams
             [bjitcask.io :as io]
-            gloss.io
+            [bjitcask.bytes :as bytes]
             [clojure.core.async :as async]))
 
 (defn KeyDir
@@ -23,14 +23,10 @@
                       (let [[key value] (case op
                                           :put [(:key command) (:value command)]
                                           :alter ((:fun command)))
-                            key-buf (-> key
-                                        (byte-streams/to-byte-buffers)
-                                        (gloss.io/to-buf-seq))
-                            val-buf (-> value
-                                        (byte-streams/to-byte-buffers)
-                                        (gloss.io/to-buf-seq))
-                            key-len (gloss.data.bytes.core/byte-count key-buf) 
-                            value-len (gloss.data.bytes.core/byte-count val-buf)
+                            key-buf (bytes/to-bytes key)
+                            val-buf (bytes/to-bytes value)
+                            key-len (bytes/byte-count key-buf) 
+                            value-len (bytes/byte-count val-buf)
                             ; TODO aysylu: refactor the hardcoded 14 bytes into
                             ; global header length variable
                             total-len (+ key-len value-len 14)
@@ -100,7 +96,7 @@
   "Convert hints in the hint file to KeyDirEntries."
   [fs data-file hint-file]
   (map (fn [{:keys [key offset total-len tstamp]}]
-         (let [value-len (- total-len 14 (gloss.data.bytes.core/byte-count key))]
+         (let [value-len (- total-len 14 (bytes/byte-count key))]
            (core/->KeyDirEntry key data-file offset value-len tstamp)))
        (io/decode-all-hints (core/scan fs hint-file))))
 
@@ -128,18 +124,12 @@
   (def kd (KeyDir (io/open (java.io.File. "/Users/aysylu/bjitcask/bctest"))))
 
   (io/encode-entry 
-    (core/->Entry (-> (byte-array 10)
-                      (byte-streams/to-byte-buffers)
-                      (gloss.io/to-buf-seq))
-                  (-> (byte-array 22)
-                      (byte-streams/to-byte-buffers)
-                      (gloss.io/to-buf-seq))
+    (core/->Entry (bytes/to-bytes (byte-array 10))
+                  (bytes/to-bytes (byte-array 22))
                   (quot (System/currentTimeMillis) 1000)))
 
   (io/encode-hint
-    (core/->HintEntry (-> (byte-array 10)
-                          (byte-streams/to-byte-buffers)
-                          (gloss.io/to-buf-seq))
+    (core/->HintEntry (bytes/to-bytes (byte-array 10))
                       1345
                       1512
                       (quot (System/currentTimeMillis) 1000)))

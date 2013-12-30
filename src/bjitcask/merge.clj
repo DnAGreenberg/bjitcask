@@ -1,5 +1,6 @@
 (ns bjitcask.merge
   (:require [bjitcask core io keydir]
+            [bjitcask.bytes :as bytes] 
             byte-streams)
   (:import java.io.File))
 
@@ -16,9 +17,8 @@
               [file [(reduce (fn [total entry]
                                (+ total
                                   14
-                                  (gloss.data.bytes.core/byte-count
-                                    (gloss.data.bytes.core/create-buf-seq
-                                      (byte-streams/to-byte-buffers (:key entry))))
+                                  (bytes/byte-count
+                                    (bytes/to-bytes (:key entry)))
                                   (:value-len entry)))
                              0
                              entries)
@@ -38,9 +38,8 @@
                                        file
                                        value-offset
                                        value-len)
-        key (gloss.data.bytes.core/create-buf-seq
-              (byte-streams/to-byte-buffers key))
-        key-len (gloss.data.bytes.core/byte-count key)
+        key (bytes/to-bytes key)
+        key-len (bytes/byte-count key)
         data-buf (bjitcask.io/encode-entry {:key key
                                             :value value-bufs
                                             :tstamp tstamp})
@@ -76,17 +75,15 @@
         (let [[data-buf hint-buf] (get-bufs-from-keydir-entry (:fs bc) entry)
               ;; This creates a new data file segment if the old one was full
               [file curr-offset]
-              (if (> (+ (gloss.data.bytes.core/byte-count data-buf)
+              (if (> (+ (bytes/byte-count data-buf)
                         (bjitcask.core/data-size file))
                      10000)
                 (do (bjitcask.core/close file)
                     (println "Rollover")
                     [(bjitcask.core/create (:fs bc)) 0])
                 [file curr-offset])
-              key-len (gloss.data.bytes.core/byte-count
-                        (gloss.io/to-buf-seq
-                          (byte-streams/to-byte-buffers
-                            (:entry key))))
+              key-len (bytes/byte-count
+                        (bytes/to-bytes (:entry key)))
               value-offset (+ curr-offset 14 key-len)
               kde (bjitcask.core/->KeyDirEntry (:key entry)
                                                (:data-file file)
