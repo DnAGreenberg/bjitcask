@@ -16,7 +16,7 @@
       bc
       (let [fs (bjitcask.io/open dir)
             init-dir (bjitcask.keydir/init fs)
-            keydir (bjitcask.keydir/KeyDir fs init-dir)
+            keydir (bjitcask.keydir/create-keydir fs init-dir)
             stop-merge-chan (async/chan)
             bc {:fs fs :keydir keydir :dir dir :stop-merge stop-merge-chan}]
         (async/go

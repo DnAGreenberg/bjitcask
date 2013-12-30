@@ -5,8 +5,8 @@
             [bjitcask.codecs :as codecs]
             [clojure.core.async :as async]))
 
-(defn KeyDir
-  ""
+(defn create-keydir
+  "Creates a keydir." 
   [fs init-dir]
   (let [chm (java.util.concurrent.ConcurrentHashMap. init-dir)
         put-chan (async/chan)
