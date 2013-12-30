@@ -1,6 +1,6 @@
 (ns bjitcask.merge
-  (:require [bjitcask core io keydir]
-            [bjitcask.bytes :as bytes] 
+  (:require [bjitcask core keydir]
+            [bjitcask.codecs :as codecs] 
             byte-streams)
   (:import java.io.File))
 
@@ -17,8 +17,8 @@
               [file [(reduce (fn [total entry]
                                (+ total
                                   14
-                                  (bytes/byte-count
-                                    (bytes/to-bytes (:key entry)))
+                                  (codecs/byte-count
+                                    (codecs/to-bytes (:key entry)))
                                   (:value-len entry)))
                              0
                              entries)
@@ -38,12 +38,12 @@
                                        file
                                        value-offset
                                        value-len)
-        key (bytes/to-bytes key)
-        key-len (bytes/byte-count key)
-        data-buf (bjitcask.io/encode-entry {:key key
+        key (codecs/to-bytes key)
+        key-len (codecs/byte-count key)
+        data-buf (codecs/encode-entry {:key key
                                             :value value-bufs
                                             :tstamp tstamp})
-        hint-buf (bjitcask.io/encode-hint {:key key
+        hint-buf (codecs/encode-hint {:key key
                                            :file file
                                            :offset (- value-offset
                                                       14
@@ -75,15 +75,15 @@
         (let [[data-buf hint-buf] (get-bufs-from-keydir-entry (:fs bc) entry)
               ;; This creates a new data file segment if the old one was full
               [file curr-offset]
-              (if (> (+ (bytes/byte-count data-buf)
+              (if (> (+ (codecs/byte-count data-buf)
                         (bjitcask.core/data-size file))
                      10000)
                 (do (bjitcask.core/close file)
                     (println "Rollover")
                     [(bjitcask.core/create (:fs bc)) 0])
                 [file curr-offset])
-              key-len (bytes/byte-count
-                        (bytes/to-bytes (:entry key)))
+              key-len (codecs/byte-count
+                        (codecs/to-bytes (:entry key)))
               value-offset (+ curr-offset 14 key-len)
               kde (bjitcask.core/->KeyDirEntry (:key entry)
                                                (:data-file file)
