@@ -1,5 +1,8 @@
 (ns bjitcask.core)
 
+(def ^:const page-size 4096)
+(def ^:const header-size 14)
+
 (defprotocol FileSystem
   (data-files [fs] "Returns collection of all data files in the bitcask")
   (hint-files [fs] "Returns collection of all hint files in the bitcask")
@@ -27,8 +30,9 @@
   (alter [bitcask fun] "fun must be a function that takes no arguments and returns a key-value pair to be `put`.")
   (close! [bitcask] "Freeze all resources associated with the Bitcask."))
 
-;;;; Global Vars
-;page size
+;;;; Global Vars DONE
+; page size
+; header size
 ;
 ;;;; Global structures
 ; entry {:tstamp :key :value}

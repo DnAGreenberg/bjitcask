@@ -16,7 +16,7 @@
               ;;TODO: should look at absolute size and yield %
               [file [(reduce (fn [total entry]
                                (+ total
-                                  14
+                                  bjitcask.core/header-size
                                   (codecs/byte-count
                                     (codecs/to-bytes (:key entry)))
                                   (:value-len entry)))
@@ -46,9 +46,11 @@
         hint-buf (codecs/encode-hint {:key key
                                            :file file
                                            :offset (- value-offset
-                                                      14
+                                                      bjitcask.core/header-size
                                                       key-len)
-                                           :total-len (+ key-len value-len 14)
+                                           :total-len (+ key-len
+                                                         value-len
+                                                         bjitcask.core/header-size)
                                            :tstamp tstamp})]
     [data-buf hint-buf]))
 
@@ -84,7 +86,7 @@
                 [file curr-offset])
               key-len (codecs/byte-count
                         (codecs/to-bytes (:entry key)))
-              value-offset (+ curr-offset 14 key-len)
+              value-offset (+ curr-offset bjitcask.core/header-size key-len)
               kde (bjitcask.core/->KeyDirEntry (:key entry)
                                                (:data-file file)
                                                value-offset
@@ -94,7 +96,8 @@
           (bjitcask.core/append-hint file hint-buf)
           (bjitcask.core/inject (:keydir bc) (:key kde) kde)
           (print ".")
-          (recur entries file (+ curr-offset 14 key-len (:value-len entry))))))
+          (recur entries file (+ value-offset
+                                 (:value-len entry))))))
     (doseq [[file] kd-yield]
       (.delete file))
     (doseq [file (->> (bjitcask.core/hint-files (:fs bc))

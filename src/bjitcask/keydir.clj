@@ -27,20 +27,18 @@
                             val-buf (codecs/to-bytes value)
                             key-len (codecs/byte-count key-buf) 
                             value-len (codecs/byte-count val-buf)
-                            ; TODO aysylu: refactor the hardcoded 14 bytes into
-                            ; global header length variable
-                            total-len (+ key-len value-len 14)
-                            ; TODO aysylu: unix time
+                            total-len (+ key-len value-len core/header-size)
+                            ; Unix time
                             now (quot (System/currentTimeMillis) 1000)
                             ;; This creates a new data file segment if the old one was full
                             [files curr-offset]
-                            (if (> (+ 14 key-len value-len
+                            (if (> (+ core/header-size key-len value-len
                                       (core/data-size files))
                                    10000)
                               (do (core/close files)
                                   [(core/create fs) 0])
                               [files curr-offset]) 
-                            value-offset (+ curr-offset 14 key-len)
+                            value-offset (+ curr-offset core/header-size key-len)
                             keydir-entry (core/->KeyDirEntry key
                                                              (:data-file files)
                                                              value-offset
@@ -96,7 +94,7 @@
   "Convert hints in the hint file to KeyDirEntries."
   [fs data-file hint-file]
   (map (fn [{:keys [key offset total-len tstamp]}]
-         (let [value-len (- total-len 14 (codecs/byte-count key))]
+         (let [value-len (- total-len core/header-size (codecs/byte-count key))]
            (core/->KeyDirEntry key data-file offset value-len tstamp)))
        (codecs/decode-all-hints (core/scan fs hint-file))))
 
