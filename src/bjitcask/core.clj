@@ -41,7 +41,7 @@
 ; - append-hint (these distinguish streams)
 ; - close
 ;
-;; Codecs
+;; Codecs DONE
 ; - decode-all-*
 ; - encode-*
 ;
