@@ -1,4 +1,5 @@
-(ns bjitcask.core)
+(ns bjitcask.core
+  (:refer-clojure :exclude [get alter]))
 
 (def ^:const page-size 4096)
 (def ^:const header-size 14)
