@@ -34,24 +34,23 @@
 (defn get-bufs-from-keydir-entry
   [fs kd-entry]
   (let [{:keys [key file value-offset value-len tstamp]} kd-entry
-        value-bufs (bjitcask.core/scan fs
-                                       file
-                                       value-offset
-                                       value-len)
-        key (codecs/to-bytes key)
-        key-len (codecs/byte-count key)
-        data-buf (codecs/encode-entry {:key key
-                                            :value value-bufs
-                                            :tstamp tstamp})
-        hint-buf (codecs/encode-hint {:key key
-                                           :file file
-                                           :offset (- value-offset
-                                                      bjitcask.core/header-size
-                                                      key-len)
-                                           :total-len (+ key-len
-                                                         value-len
-                                                         bjitcask.core/header-size)
-                                           :tstamp tstamp})]
+        value-buf (bjitcask.core/scan fs
+                                      file
+                                      value-offset
+                                      value-len)
+        key-buf (codecs/to-bytes key)
+        key-len (codecs/byte-count key-buf)
+        data-buf (codecs/encode-entry {:key key-buf
+                                       :value value-buf
+                                       :tstamp tstamp})
+        hint-buf (codecs/encode-hint {:key key-buf
+                                      :offset (- value-offset
+                                                 bjitcask.core/header-size
+                                                 key-len)
+                                      :total-len (+ key-len
+                                                    value-len
+                                                    bjitcask.core/header-size)
+                                      :tstamp tstamp})]
     [data-buf hint-buf]))
 
 (defn process-bitcask
@@ -85,7 +84,7 @@
                     [(bjitcask.core/create (:fs bc)) 0])
                 [file curr-offset])
               key-len (codecs/byte-count
-                        (codecs/to-bytes (:entry key)))
+                        (codecs/to-bytes (:key entry)))
               value-offset (+ curr-offset bjitcask.core/header-size key-len)
               kde (bjitcask.core/->KeyDirEntry (:key entry)
                                                (:data-file file)
