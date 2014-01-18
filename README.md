@@ -31,6 +31,8 @@ bjitcask currently doesn't release memory used to store keys when they're delete
 
 Startup options, such as merging parameters and file size limits, are currently ignored.
 
+Use proper logging to communicate information about the status of merging.
+
 ## License
 
 Copyright © 2013 Aysylu and David Greenberg
