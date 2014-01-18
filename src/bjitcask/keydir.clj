@@ -45,7 +45,7 @@
                                                              value-len
                                                              now)
                             data-entry (core/->Entry key-buf val-buf now)
-                            hint-entry (core/->HintEntry key-buf value-offset total-len now)
+                            hint-entry (core/->HintEntry key-buf curr-offset total-len now)
                             data-buf (codecs/encode-entry data-entry)
                             hint-buf (codecs/encode-hint hint-entry)]
                         (core/append-data files data-buf)
@@ -95,8 +95,10 @@
   "Convert hints in the hint file to KeyDirEntries."
   [fs data-file hint-file]
   (map (fn [{:keys [key offset total-len tstamp]}]
-         (let [value-len (- total-len core/header-size (codecs/byte-count key))]
-           (core/->KeyDirEntry key data-file offset value-len tstamp)))
+         (let [key-len (codecs/byte-count key)
+               value-len (- total-len core/header-size key-len)
+               value-offset (+ offset core/header-size key-len)]
+           (core/->KeyDirEntry key data-file value-offset value-len tstamp)))
        (codecs/decode-all-hints (core/scan fs hint-file))))
 
 (defn list-keydir-entries

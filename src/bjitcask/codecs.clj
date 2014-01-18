@@ -88,7 +88,7 @@
                 keysz (byte-count key)
                 valsz (byte-count (:value entry))
                 entry-len (+ core/header-size keysz valsz) 
-                value-offset (+ curr-offset keysz)
+                value-offset (+ curr-offset keysz core/header-size)
                 keydir-entry (core/->KeyDirEntry key
                                                  data-file
                                                  value-offset
