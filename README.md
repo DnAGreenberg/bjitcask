@@ -8,13 +8,28 @@ Besides `get` and `put`, bjitcask supports `alter`, which offers a limited form 
 
 ## Usage
 
-More usage information to come...
+bjitcask's public API can be found in the namespace `bjitcask`.
 
-Bjitcask can open a lot of files. Maybe you need more file descriptors? Try:
+- `bjitcask/open` creates or opens a bjitcask at the given location
+- `bjitcask/close` closes a bjitcask gracefully
+- `bjitcask/get` reads a value from the bjitcask
+- `bjitcask/put` writes a value to the bjitcask
+- `bjitcask/alter` allows for multi-key read, single-key write transactions
+- `bjitcask/delete` deletes the given key
+
+## Caveats
+
+bjitcask can open a lot of files. Maybe you need more file descriptors? Try:
 
 ```
 ulimit -n 10000
 ```
+
+## TODOs
+
+bjitcask currently doesn't release memory used to store keys when they're deleted. Also, keys should be stored in off-heap memory.
+
+Startup options, such as merging parameters and file size limits, are currently ignored.
 
 ## License
 
