@@ -31,28 +31,31 @@
   [kd-files files]
   (remove (set kd-files) files))
 
-(defn get-bufs-from-keydir-entry
+(defn get-data-buf-from-keydir-entry
   [fs kd-entry]
-  (let [{:keys [key file value-offset value-len tstamp]} kd-entry
-        value-bufs (bjitcask.core/scan fs
+  (let  [{:keys [key file value-offset value-len tstamp]} kd-entry
+         value-buf (bjitcask.core/scan fs
                                        file
                                        value-offset
                                        value-len)
-        key (codecs/to-bytes key)
-        key-len (codecs/byte-count key)
-        data-buf (codecs/encode-entry {:key key
-                                            :value value-bufs
-                                            :tstamp tstamp})
-        hint-buf (codecs/encode-hint {:key key
-                                           :file file
-                                           :offset (- value-offset
-                                                      bjitcask.core/header-size
-                                                      key-len)
-                                           :total-len (+ key-len
-                                                         value-len
-                                                         bjitcask.core/header-size)
-                                           :tstamp tstamp})]
-    [data-buf hint-buf]))
+         key-buf (codecs/to-bytes key)
+         data-buf (codecs/encode-entry {:key key-buf
+                                        :value value-buf
+                                        :tstamp tstamp})]
+    data-buf))
+
+(defn get-hint-buf-from-keydir-entry
+  [fs kd-entry offset]
+  (let [{:keys [key value-len tstamp]} kd-entry
+        key-buf (codecs/to-bytes key)
+        key-len (codecs/byte-count key-buf)
+        hint-buf (codecs/encode-hint {:key key-buf
+                                      :offset offset
+                                      :total-len (+ key-len
+                                                    value-len
+                                                    bjitcask.core/header-size)
+                                      :tstamp tstamp})]
+    hint-buf))
 
 (defn process-bitcask
   [bc]
@@ -74,7 +77,7 @@
            file (bjitcask.core/create (:fs bc))
            curr-offset 0]
       (when entry
-        (let [[data-buf hint-buf] (get-bufs-from-keydir-entry (:fs bc) entry)
+        (let [data-buf (get-data-buf-from-keydir-entry (:fs bc) entry)
               ;; This creates a new data file segment if the old one was full
               [file curr-offset]
               (if (> (+ (codecs/byte-count data-buf)
@@ -84,8 +87,9 @@
                     (println "Rollover")
                     [(bjitcask.core/create (:fs bc)) 0])
                 [file curr-offset])
+              hint-buf (get-hint-buf-from-keydir-entry (:fs bc) entry curr-offset) 
               key-len (codecs/byte-count
-                        (codecs/to-bytes (:entry key)))
+                        (codecs/to-bytes (:key entry)))
               value-offset (+ curr-offset bjitcask.core/header-size key-len)
               kde (bjitcask.core/->KeyDirEntry (:key entry)
                                                (:data-file file)
