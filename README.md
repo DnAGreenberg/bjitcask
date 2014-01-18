@@ -1,3 +1,4 @@
+![bjitcask logo](https://raw.github.com/DnAGreenberg/bjitcask/master/doc/bjitcask_logo.png "bjitcask")
 # bjitcask
 
 [![Build Status](https://travis-ci.org/DnAGreenberg/bjitcask.png?branch=master)](https://travis-ci.org/DnAGreenberg/bjitcask)
