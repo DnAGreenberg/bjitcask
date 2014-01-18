@@ -39,9 +39,10 @@
                                        value-offset
                                        value-len)
          key-buf (codecs/to-bytes key)
-         data-buf (codecs/encode-entry {:key key-buf
-                                        :value value-buf
-                                        :tstamp tstamp})]
+         data-buf (codecs/encode-entry (bjitcask.core/->Entry
+                                         key-buf
+                                         value-buf
+                                         tstamp))]
     data-buf))
 
 (defn get-hint-buf-from-keydir-entry
@@ -49,12 +50,13 @@
   (let [{:keys [key value-len tstamp]} kd-entry
         key-buf (codecs/to-bytes key)
         key-len (codecs/byte-count key-buf)
-        hint-buf (codecs/encode-hint {:key key-buf
-                                      :offset offset
-                                      :total-len (+ key-len
-                                                    value-len
-                                                    bjitcask.core/header-size)
-                                      :tstamp tstamp})]
+        hint-buf (codecs/encode-hint (bjitcask.core/->HintEntry
+                                       key-buf
+                                       offset
+                                       (+ key-len
+                                          value-len
+                                          bjitcask.core/header-size)
+                                       tstamp))]
     hint-buf))
 
 (defn process-bitcask
