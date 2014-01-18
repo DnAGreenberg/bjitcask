@@ -1,6 +1,6 @@
 # bjitcask
 
-[![Build Status](https://travis-ci.org/dgrnbrg/bjitcask.png?branch=master)](https://travis-ci.org/dgrnbrg/bjitcask)
+[![Build Status](https://travis-ci.org/DnAGreenberg/bjitcask.png?branch=master)](https://travis-ci.org/DnAGreenberg/bjitcask)
 
 A Clojure library that provides a high performance on-disk key-value store. Every get and put operation is guaranteed to trigger at most a single disk IO, so that the latency of operations is deterministic. This is a binary-compatibly implementation of Bitcask, which lives here: https://github.com/basho/bitcask and is described in the paper here: https://github.com/basho/bitcask/blob/develop/doc/bitcask-intro.pdf?raw=true
 
