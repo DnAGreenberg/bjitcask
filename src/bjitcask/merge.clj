@@ -1,6 +1,6 @@
 (ns bjitcask.merge
-  (:require [bjitcask core keydir]
-            [bjitcask.codecs :as codecs] 
+  (:require [bjitcask core io keydir]
+            [bjitcask.codecs :as codecs]
             byte-streams)
   (:import java.io.File))
 
@@ -82,13 +82,10 @@
         (let [data-buf (get-data-buf-from-keydir-entry (:fs bc) entry)
               ;; This creates a new data file segment if the old one was full
               [file curr-offset]
-              (if (> (+ (codecs/byte-count data-buf)
-                        (bjitcask.core/data-size file))
-                     10000)
-                (do (bjitcask.core/close! file)
-                    (println "Rollover")
-                    [(bjitcask.core/create (:fs bc)) 0])
-                [file curr-offset])
+              (bjitcask.io/get-file-offset-or-rollover file
+                                                       curr-offset
+                                                       (codecs/byte-count data-buf)
+                                                       (:fs bc))
               hint-buf (get-hint-buf-from-keydir-entry (:fs bc) entry curr-offset) 
               key-len (codecs/byte-count
                         (codecs/to-bytes (:key entry)))

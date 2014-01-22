@@ -25,6 +25,16 @@
     (.close data)
     (.close hint)))
 
+(defn get-file-offset-or-rollover
+  [file curr-offset data-size fs]
+  (if (> (+ data-size 
+            (core/data-size file))
+         10000)
+    (do (core/close! file)
+        ;; TODO: log rollover to INFO here
+        [(core/create fs) 0])
+    [file curr-offset]))
+
 (comment
   (mapv (fn [{:keys [key value tstamp]}]
           (byte-streams/print-bytes key)
