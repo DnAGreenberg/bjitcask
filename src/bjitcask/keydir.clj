@@ -110,11 +110,17 @@
       (codecs/decode-all-keydir-entries data-file))))
 
 (defn init
-  ""
+  "Initializes the KeyDir's chm from files."
   [fs]
   (let  [chm (java.util.HashMap.)
          ; data files in order from oldest first
-         data-files (sort-by #(.lastModified %) (core/data-files fs))]
+         data-files (sort-by
+                      (fn [file]
+                        (let [file-name (.getName file)]
+                          (->> (.indexOf file-name ".")
+                               (.substring file-name 0)
+                               (Integer/parseInt))))
+                      (core/data-files fs))]
     (->> data-files
          (mapcat (partial list-keydir-entries fs))
          (reduce (fn [chm entry] (doto chm
