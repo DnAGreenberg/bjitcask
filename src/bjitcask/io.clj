@@ -2,13 +2,14 @@
   (:require [bjitcask.core :as core]
             [bjitcask.codecs :as codecs]
             [gloss.io :as gio]
+            [clojure.tools.logging :as log]
             [clojure.core.async :as async]
             byte-streams)
   (:import [java.io RandomAccessFile File FilenameFilter]
            [java.nio ByteBuffer]
            [java.util Arrays]))
 
-(defrecord DataFile [data data-file hint active-size]
+(defrecord DataFile [data data-file hint active-size config]
   core/IDataWriter
   (data-size [this]
     @active-size)
@@ -29,9 +30,9 @@
   [file curr-offset data-size fs]
   (if (> (+ data-size 
             (core/data-size file))
-         10000)
+         (get-in file [:config :max-data-file-size]))
     (do (core/close! file)
-        ;; TODO: log rollover to INFO here
+        (log/info (format "Roll over data file. Size was %d, overflower was %d" curr-offset data-size))
         [(core/create fs) 0])
     [file curr-offset]))
 
@@ -122,7 +123,7 @@
 
 (defn open
   "Takes a directory and opens the bitcask inside."
-  [^File dir]
+  [^File dir config]
   (assert (.isDirectory dir) "Bitcask must be a directory")
   (let [suffix-len (count ".bitcask.data")
         largest-int (->> (data-files dir)
@@ -131,7 +132,7 @@
                                   (Long. (.substring n 0 (- (count n) suffix-len))))))
                          (reduce max 0)
                          atom)]
-    (println "largest-int is starting at" largest-int)
+    (log/info "Largest number of preexisting data file is" largest-int)
     (reify core/FileSystem
       (data-files [_] (data-files dir))
       (hint-files [_] (hint-files dir))
@@ -147,6 +148,7 @@
       (scan [fs file]
         (core/scan fs file 0 (.length file)))
       (scan [fs file offset length]
+        (log/debug (format "Scanning %s from %d to %d" file offset length))
         (let [channel
               (-> file
                   (RandomAccessFile. "r")
@@ -161,8 +163,9 @@
           bytes))
       (create [_]
         (let [id (swap! largest-int inc)
+              _ (log/debug "Creating a new hint/data file pair with id" id)
               data-file (File. dir (str id ".bitcask.data"))
               hint-file (File. dir (str id ".bitcask.hint"))
               data (.getChannel (RandomAccessFile. data-file "rw"))
               hint (.getChannel (RandomAccessFile. hint-file "rw"))]
-          (->DataFile data data-file hint (atom 0)))))))
+          (->DataFile data data-file hint (atom 0) config))))))

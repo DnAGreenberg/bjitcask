@@ -1,6 +1,7 @@
 (ns bjitcask.keydir
   (:require [bjitcask.core :as core]
             byte-streams
+            [clojure.tools.logging :as log]
             [bjitcask.io :as io]
             [bjitcask.codecs :as codecs]
             [clojure.core.async :as async]))
@@ -9,7 +10,7 @@
 
 (defn create-keydir
   "Creates a keydir." 
-  [fs init-dir]
+  [fs init-dir config]
   (let [chm (java.util.concurrent.ConcurrentHashMap. init-dir)
         put-chan (async/chan)
         stop-chan (async/chan)]
@@ -117,12 +118,14 @@
   [fs data-file]
   (let [hint-file (core/hint-file fs data-file)]
     (if hint-file
-      (hint->keydir-entry fs data-file hint-file)
-      (codecs/decode-all-keydir-entries data-file))))
+      (do (log/info "Loading hint %s into keydir" (.getPath hint-file))
+          (hint->keydir-entry fs data-file hint-file))
+      (do (log/info "Loading data %s into keydir" (.getPath hint-file))
+          (codecs/decode-all-keydir-entries data-file)))))
 
 (defn init
   "Initializes the KeyDir's chm from files."
-  [fs]
+  [fs config]
   (let  [chm (java.util.HashMap.)
          ; data files in order from oldest first
          data-files (sort-by
