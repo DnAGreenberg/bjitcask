@@ -1,6 +1,7 @@
 (ns bjitcask.merge
   (:require [bjitcask core io keydir]
             [bjitcask.codecs :as codecs]
+            [clojure.tools.logging :as log]
             byte-streams)
   (:import java.io.File))
 
@@ -77,9 +78,8 @@
                      (sort-by (fn [[file [size entries]]] size))
                      (mapcat (fn [[file [size entries]]]
                                entries)))]
-    ; TODO log info the deletion of data files
-    ;(println "Deleting data files with no active data:" stale-files)
     (doseq [file stale-files]
+      (log/info (format "Deleting %s due to no active data remaining") (.getPath file))
       (.delete file))
     (loop [[entry & entries] entries
            file (bjitcask.core/create (:fs bc))
@@ -104,17 +104,20 @@
           (bjitcask.core/append-data file data-buf)
           (bjitcask.core/append-hint file hint-buf)
           (bjitcask.core/inject (:keydir bc) (:key kde) kde)
-          (print ".")
           (recur entries file (+ value-offset
                                  (:value-len entry))))))
-    (doseq [[file] kd-yield]
+    (doseq [[file [size entries]] kd-yield]
+      (log/info (format "Deleting %s due to kd-yield of %f"
+                        (.getPath file)
+                        (float (/ size (.length file)))))
       (.delete file))
     (doseq [file (->> (bjitcask.core/hint-files (:fs bc))
                       (remove (->> (bjitcask.core/data-files (:fs bc))
                                    (map #(bjitcask.core/hint-file (:fs bc) %))
                                    (set))))]
+      (log/info (format "Deleting unused hint file %s" file))
       (.delete file))
-    (println "Compacting" (count entries) "entries")))
+    (log/info "Compacted" (count entries) "entries")))
 
 (comment
   (def my-bc  (bjitcask.registry/open "/Users/dgrnbrg/test-bc"))

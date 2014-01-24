@@ -1,6 +1,7 @@
 (ns bjitcask.registry
   (:require [bjitcask core keydir io merge]
             [clojure.core.async :as async]
+            [clojure.tools.logging :as log]
             [clojure.java.io]))
 
 (def registry-atom (atom {}))
@@ -15,12 +16,16 @@
              merge-frequency 300
              merge-fragmentation-threshold 0.7}}]
   (let [dir (clojure.java.io/file dir)]
-    (when-not (.exists dir)
-      (.mkdirs dir))
+    (if-not (.exists dir)
+      (do (log/debug (format "mkdir %s" (.getPath dir)))
+          (.mkdirs dir)))
     (assert (.isDirectory dir) (str dir " must refer to a directory"))
     (if-let [bc (get @registry-atom dir)]
-      bc
-      (let [fs (bjitcask.io/open dir config)
+      (do (log/info (format "Returning previously opened Bjitcask %s"
+                            (.getPath dir)))
+          bc)
+      (let [_ (log/info (format "Opening Bjitcask %s" (.getPath dir)))
+            fs (bjitcask.io/open dir config)
             init-dir (bjitcask.keydir/init fs config)
             keydir (bjitcask.keydir/create-keydir fs init-dir config)
             stop-merge-chan (async/chan)
@@ -31,12 +36,13 @@
               stop-merge-chan ([_] nil)
               merge-chan ([_]
                           (bjitcask.merge/process-bitcask bc config)
-                         (recur (async/timeout (* merge-frequency 1000)))))))
+                          (recur (async/timeout (* merge-frequency 1000)))))))
         (swap! registry-atom assoc dir bc)
         bc))))
 
 (defn close
   [bc]
+  (log/info (format "Closing Bjitcask %s" (-> bc :dir .getPath)))
   (swap! registry-atom dissoc (:dir bc))
   (async/close! (:stop-merge bc))
   (bjitcask.core/close! (:keydir bc)))

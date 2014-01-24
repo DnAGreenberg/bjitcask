@@ -2,6 +2,7 @@
   (:require [bjitcask.core :as core]
             [bjitcask.codecs :as codecs]
             [gloss.io :as gio]
+            [clojure.tools.logging :as log]
             [clojure.core.async :as async]
             byte-streams)
   (:import [java.io RandomAccessFile File FilenameFilter]
@@ -31,8 +32,7 @@
             (core/data-size file))
          (get-in file [:config :max-data-file-size]))
     (do (core/close! file)
-        ;; TODO: log rollover to INFO here
-        (println "rollover")
+        (log/info (format "Roll over data file. Size was %d, overflower was %d" curr-offset data-size))
         [(core/create fs) 0])
     [file curr-offset]))
 
@@ -132,7 +132,7 @@
                                   (Long. (.substring n 0 (- (count n) suffix-len))))))
                          (reduce max 0)
                          atom)]
-    (println "largest-int is starting at" largest-int)
+    (log/info "Largest number of preexisting data file is" largest-int)
     (reify core/FileSystem
       (data-files [_] (data-files dir))
       (hint-files [_] (hint-files dir))
@@ -148,6 +148,7 @@
       (scan [fs file]
         (core/scan fs file 0 (.length file)))
       (scan [fs file offset length]
+        (log/debug (format "Scanning %s from %d to %d" file offset length))
         (let [channel
               (-> file
                   (RandomAccessFile. "r")
@@ -162,6 +163,7 @@
           bytes))
       (create [_]
         (let [id (swap! largest-int inc)
+              _ (log/debug "Creating a new hint/data file pair with id" id)
               data-file (File. dir (str id ".bitcask.data"))
               hint-file (File. dir (str id ".bitcask.hint"))
               data (.getChannel (RandomAccessFile. data-file "rw"))

@@ -105,8 +105,10 @@
   [fs data-file]
   (let [hint-file (core/hint-file fs data-file)]
     (if hint-file
-      (hint->keydir-entry fs data-file hint-file)
-      (codecs/decode-all-keydir-entries data-file))))
+      (do (log/info "Loading hint %s into keydir" (.getPath hint-file))
+          (hint->keydir-entry fs data-file hint-file))
+      (do (log/info "Loading data %s into keydir" (.getPath hint-file))
+          (codecs/decode-all-keydir-entries data-file)))))
 
 (defn init
   "Initializes the KeyDir's chm from files."
