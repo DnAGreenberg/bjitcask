@@ -1,6 +1,6 @@
 (ns bjitcask.merge
-  (:require [bjitcask core keydir]
-            [bjitcask.codecs :as codecs] 
+  (:require [bjitcask core io keydir]
+            [bjitcask.codecs :as codecs]
             byte-streams)
   (:import java.io.File))
 
@@ -61,8 +61,13 @@
 
 (defn process-bitcask
   [bc config]
-  (let [files (->> (bjitcask.core/data-files (:fs bc))
-                   (sort-by #(.lastModified ^File %)))
+  (let [files (sort-by
+                (fn [file]
+                  (let [file-name (.getName file)]
+                    (->> (.indexOf file-name ".")
+                         (.substring file-name 0)
+                         (Integer/parseInt))))
+                (bjitcask.core/data-files (:fs bc)))
         active-file (last files)
         files (drop-last files)
         kd-yield (dissoc (calculate-yield-per-file (bjitcask.core/keydir (:keydir bc)))
@@ -72,7 +77,8 @@
                      (sort-by (fn [[file [size entries]]] size))
                      (mapcat (fn [[file [size entries]]]
                                entries)))]
-    (println "Deleting data files with no active data:" stale-files)
+    ; TODO log info the deletion of data files
+    ;(println "Deleting data files with no active data:" stale-files)
     (doseq [file stale-files]
       (.delete file))
     (loop [[entry & entries] entries
@@ -82,13 +88,10 @@
         (let [data-buf (get-data-buf-from-keydir-entry (:fs bc) entry)
               ;; This creates a new data file segment if the old one was full
               [file curr-offset]
-              (if (> (+ (codecs/byte-count data-buf)
-                        (bjitcask.core/data-size file))
-                     (:max-data-file-size config))
-                (do (bjitcask.core/close! file)
-                    (println "Rollover")
-                    [(bjitcask.core/create (:fs bc)) 0])
-                [file curr-offset])
+              (bjitcask.io/get-file-offset-or-rollover file
+                                                       curr-offset
+                                                       (codecs/byte-count data-buf)
+                                                       (:fs bc))
               hint-buf (get-hint-buf-from-keydir-entry (:fs bc) entry curr-offset) 
               key-len (codecs/byte-count
                         (codecs/to-bytes (:key entry)))

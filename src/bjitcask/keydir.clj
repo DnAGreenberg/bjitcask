@@ -12,12 +12,12 @@
         put-chan (async/chan)
         stop-chan (async/chan)]
     (async/go
-      (loop [files (core/create fs)
+      (loop [file (core/create fs)
              curr-offset 0]
         (async/alt!
           stop-chan ([_]
                      (async/close! put-chan)
-                     (recur files curr-offset))
+                     (recur file curr-offset))
           put-chan ([{:keys [op ack-chan] :as command}]
                     (if command
                       (let [[key value] (case op
@@ -30,30 +30,29 @@
                             total-len (+ key-len value-len core/header-size)
                             ; Unix time
                             now (quot (System/currentTimeMillis) 1000)
+                            ; data entry
+                            data-entry (core/->Entry key-buf val-buf now)
+                            data-buf (codecs/encode-entry data-entry)
                             ;; This creates a new data file segment if the old one was full
-                            [files curr-offset]
-                            (if (> (+ core/header-size key-len value-len
-                                      (core/data-size files))
-                                   (:max-data-file-size config))
-                              (do (core/close! files)
-                                  [(core/create fs) 0])
-                              [files curr-offset]) 
+                            [file curr-offset]
+                            (io/get-file-offset-or-rollover file
+                                                            curr-offset
+                                                            (codecs/byte-count data-buf)
+                                                            fs)
                             value-offset (+ curr-offset core/header-size key-len)
                             keydir-entry (core/->KeyDirEntry key
-                                                             (:data-file files)
+                                                             (:data-file file)
                                                              value-offset
                                                              value-len
                                                              now)
-                            data-entry (core/->Entry key-buf val-buf now)
                             hint-entry (core/->HintEntry key-buf curr-offset total-len now)
-                            data-buf (codecs/encode-entry data-entry)
                             hint-buf (codecs/encode-hint hint-entry)]
-                        (core/append-data files data-buf)
-                        (core/append-hint files hint-buf)   
+                        (core/append-data file data-buf)
+                        (core/append-hint file hint-buf)   
                         (.put chm key keydir-entry)
                         (async/close! ack-chan)
-                        (recur files (+ curr-offset total-len))) 
-                      (core/close! files))))))
+                        (recur file (+ curr-offset total-len))) 
+                      (core/close! file))))))
     (reify
       bjitcask.core.Bitcask
       (keydir [kd]
@@ -110,11 +109,17 @@
       (codecs/decode-all-keydir-entries data-file))))
 
 (defn init
-  ""
+  "Initializes the KeyDir's chm from files."
   [fs config]
   (let  [chm (java.util.HashMap.)
          ; data files in order from oldest first
-         data-files (sort-by #(.lastModified %) (core/data-files fs))]
+         data-files (sort-by
+                      (fn [file]
+                        (let [file-name (.getName file)]
+                          (->> (.indexOf file-name ".")
+                               (.substring file-name 0)
+                               (Integer/parseInt))))
+                      (core/data-files fs))]
     (->> data-files
          (mapcat (partial list-keydir-entries fs))
          (reduce (fn [chm entry] (doto chm

@@ -8,7 +8,7 @@
            [java.nio ByteBuffer]
            [java.util Arrays]))
 
-(defrecord DataFile [data data-file hint active-size]
+(defrecord DataFile [data data-file hint active-size config]
   core/IDataWriter
   (data-size [this]
     @active-size)
@@ -24,6 +24,17 @@
   (close! [this]
     (.close data)
     (.close hint)))
+
+(defn get-file-offset-or-rollover
+  [file curr-offset data-size fs]
+  (if (> (+ data-size 
+            (core/data-size file))
+         (get-in file [:config :max-data-file-size]))
+    (do (core/close! file)
+        ;; TODO: log rollover to INFO here
+        (println "rollover")
+        [(core/create fs) 0])
+    [file curr-offset]))
 
 (comment
   (mapv (fn [{:keys [key value tstamp]}]
@@ -155,4 +166,4 @@
               hint-file (File. dir (str id ".bitcask.hint"))
               data (.getChannel (RandomAccessFile. data-file "rw"))
               hint (.getChannel (RandomAccessFile. hint-file "rw"))]
-          (->DataFile data data-file hint (atom 0)))))))
+          (->DataFile data data-file hint (atom 0) config))))))
