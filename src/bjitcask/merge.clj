@@ -72,7 +72,8 @@
                      (sort-by (fn [[file [size entries]]] size))
                      (mapcat (fn [[file [size entries]]]
                                entries)))]
-    (println "Deleting data files with no active data:" stale-files)
+    ; TODO log info the deletion of data files
+    ;(println "Deleting data files with no active data:" stale-files)
     (doseq [file stale-files]
       (.delete file))
     (loop [[entry & entries] entries
