@@ -7,7 +7,7 @@
 
 (defn create-keydir
   "Creates a keydir." 
-  [fs init-dir]
+  [fs init-dir config]
   (let [chm (java.util.concurrent.ConcurrentHashMap. init-dir)
         put-chan (async/chan)
         stop-chan (async/chan)]
@@ -34,7 +34,7 @@
                             [files curr-offset]
                             (if (> (+ core/header-size key-len value-len
                                       (core/data-size files))
-                                   10000)
+                                   (:max-data-file-size config))
                               (do (core/close! files)
                                   [(core/create fs) 0])
                               [files curr-offset]) 
@@ -111,7 +111,7 @@
 
 (defn init
   ""
-  [fs]
+  [fs config]
   (let  [chm (java.util.HashMap.)
          ; data files in order from oldest first
          data-files (sort-by #(.lastModified %) (core/data-files fs))]

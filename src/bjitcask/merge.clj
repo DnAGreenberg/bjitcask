@@ -60,7 +60,7 @@
     hint-buf))
 
 (defn process-bitcask
-  [bc]
+  [bc config]
   (let [files (->> (bjitcask.core/data-files (:fs bc))
                    (sort-by #(.lastModified ^File %)))
         active-file (last files)
@@ -84,7 +84,7 @@
               [file curr-offset]
               (if (> (+ (codecs/byte-count data-buf)
                         (bjitcask.core/data-size file))
-                     10000)
+                     (:max-data-file-size config))
                 (do (bjitcask.core/close! file)
                     (println "Rollover")
                     [(bjitcask.core/create (:fs bc)) 0])

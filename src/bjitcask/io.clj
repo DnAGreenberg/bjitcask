@@ -112,7 +112,7 @@
 
 (defn open
   "Takes a directory and opens the bitcask inside."
-  [^File dir]
+  [^File dir config]
   (assert (.isDirectory dir) "Bitcask must be a directory")
   (let [suffix-len (count ".bitcask.data")
         largest-int (->> (data-files dir)

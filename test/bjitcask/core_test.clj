@@ -17,11 +17,15 @@
         (.delete f))
     (.delete f)))
 
+(def config
+  {:max-data-file-size 1000
+   :merge-frequency 1000000000})
+
 (deftest basic-functionality
-  (let [my-bc  (bjitcask.registry/open "test-bc")
+  (let [my-bc  (bjitcask.registry/open "test-bc" config)
         _ (bjitcask.registry/close my-bc)
         _ (rm-r (java.io.File. "test-bc"))
-        my-bc (bjitcask.registry/open "test-bc")
+        my-bc (bjitcask.registry/open "test-bc" config)
         max-byte-array-sz 200
         sample-set (map #(str "test" %)  (range 100))
         value-set (repeatedly 100 #(byte-array (inc (rand-int max-byte-array-sz))))
@@ -35,14 +39,14 @@
       (is v' (str "Key " k  " is nil"))
       (is (byte-streams/bytes= v v')))
 
-    (bjitcask.merge/process-bitcask my-bc)
+    (bjitcask.merge/process-bitcask my-bc config)
     (doseq [[k v] (map vector sample-set value-set)
             :let [v' (bjitcask.core/get (:keydir my-bc) k)]]
       (is v' (str "Key " k  " is nil"))
       (is (byte-streams/bytes= v v')))
 
     (bjitcask.registry/close my-bc)
-    (let [my-bc (bjitcask.registry/open "test-bc")]
+    (let [my-bc (bjitcask.registry/open "test-bc" config)]
       (doseq [[k v] (map vector sample-set value-set)
               :let [v' (bjitcask.core/get (:keydir my-bc) k)]]
         (is v' (str "Key " k  " is nil"))

@@ -11,12 +11,12 @@
    - `merge-frequency` determines how often old logs are garbage collected
    - `merge-fragmentation-threshold` determines which logs are garbage collected
    "
-  [directory & {:keys [max-data-file-size
-                       merge-frequency
-                       merge-fragmentation-threshold]
-                :or {max-data-file-size 1000000000
-                     merge-frequency 300
-                     merge-fragmentation-threshold 0.7}}]
+  [directory {:keys [max-data-file-size
+                     merge-frequency
+                     merge-fragmentation-threshold]
+              :or {max-data-file-size 1000000000
+                   merge-frequency 300
+                   merge-fragmentation-threshold 0.7}}]
   (bjitcask.registry/open directory))
 
 (defn close
