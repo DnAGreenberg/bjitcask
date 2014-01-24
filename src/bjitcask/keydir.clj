@@ -5,6 +5,8 @@
             [bjitcask.codecs :as codecs]
             [clojure.core.async :as async]))
 
+(declare process-command)
+
 (defn create-keydir
   "Creates a keydir." 
   [fs init-dir]
@@ -18,40 +20,12 @@
           stop-chan ([_]
                      (async/close! put-chan)
                      (recur file curr-offset))
-          put-chan ([{:keys [op ack-chan] :as command}]
+          put-chan ([{:keys [ack-chan] :as command}]
                     (if command
-                      (let [[key value] (case op
-                                          :put [(:key command) (:value command)]
-                                          :alter ((:fun command)))
-                            key-buf (codecs/to-bytes key)
-                            val-buf (codecs/to-bytes value)
-                            key-len (codecs/byte-count key-buf) 
-                            value-len (codecs/byte-count val-buf)
-                            total-len (+ key-len value-len core/header-size)
-                            ; Unix time
-                            now (quot (System/currentTimeMillis) 1000)
-                            ; data entry
-                            data-entry (core/->Entry key-buf val-buf now)
-                            data-buf (codecs/encode-entry data-entry)
-                            ;; This creates a new data file segment if the old one was full
-                            [file curr-offset]
-                            (io/get-file-offset-or-rollover file
-                                                            curr-offset
-                                                            (codecs/byte-count data-buf)
-                                                            fs)
-                            value-offset (+ curr-offset core/header-size key-len)
-                            keydir-entry (core/->KeyDirEntry key
-                                                             (:data-file file)
-                                                             value-offset
-                                                             value-len
-                                                             now)
-                            hint-entry (core/->HintEntry key-buf curr-offset total-len now)
-                            hint-buf (codecs/encode-hint hint-entry)]
-                        (core/append-data file data-buf)
-                        (core/append-hint file hint-buf)   
-                        (.put chm key keydir-entry)
+                      (let [[file offset]
+                            (process-command fs file curr-offset command chm)]
                         (async/close! ack-chan)
-                        (recur file (+ curr-offset total-len))) 
+                        (recur file offset))
                       (core/close! file))))))
     (reify
       bjitcask.core.Bitcask
@@ -89,6 +63,44 @@
                        (async/<!! ack-chan)))
       core/IClose
       (close! [_] (async/close! stop-chan)))))
+
+(defn handle-keydir-data-hint-entries
+  [key value fs file curr-offset chm]
+  (let [key-buf (codecs/to-bytes key)
+        val-buf (codecs/to-bytes value)
+        key-len (codecs/byte-count key-buf)
+        val-len (codecs/byte-count val-buf)
+        total-len (+ key-len val-len core/header-size)
+        ; Unix time
+        now (quot (System/currentTimeMillis) 1000)
+        ; data entry
+        data-entry (core/->Entry key-buf val-buf now)
+        data-buf (codecs/encode-entry data-entry)
+        ;; This creates a new data file segment if the old one was full
+        [file curr-offset]
+        (io/get-file-offset-or-rollover file
+                                        curr-offset
+                                        (codecs/byte-count data-buf)
+                                        fs)
+        hint-entry (core/->HintEntry key-buf curr-offset total-len now)
+        hint-buf (codecs/encode-hint hint-entry)
+        val-offset (+ curr-offset core/header-size key-len)
+        keydir-entry (core/->KeyDirEntry key
+                                         (:data-file file)
+                                         val-offset
+                                         val-len
+                                         now)]
+    (core/append-data file data-buf)
+    (core/append-hint file hint-buf)
+    (.put chm key keydir-entry) 
+    [file (+ curr-offset total-len)]))
+
+(defn process-command
+  [fs file curr-offset command chm]
+  (let [[key value] (case (:op command)
+                      :put [(:key command) (:value command)]
+                      :alter ((:fun command)))]
+    (handle-keydir-data-hint-entries key value fs file curr-offset chm)))
 
 (defn hint->keydir-entry
   "Convert hints in the hint file to KeyDirEntries."

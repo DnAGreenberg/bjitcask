@@ -141,4 +141,3 @@
 (defn decode-all-hints
   [buf]
   (gio/decode-all bitcask-hint buf))
-
