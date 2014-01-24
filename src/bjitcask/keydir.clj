@@ -1,6 +1,7 @@
 (ns bjitcask.keydir
   (:require [bjitcask.core :as core]
             byte-streams
+            [clojure.tools.logging :as log]
             [bjitcask.io :as io]
             [bjitcask.codecs :as codecs]
             [clojure.core.async :as async]))
