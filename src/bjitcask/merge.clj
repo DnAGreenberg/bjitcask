@@ -61,8 +61,13 @@
 
 (defn process-bitcask
   [bc]
-  (let [files (->> (bjitcask.core/data-files (:fs bc))
-                   (sort-by #(.lastModified ^File %)))
+  (let [files (sort-by
+                (fn [file]
+                  (let [file-name (.getName file)]
+                    (->> (.indexOf file-name ".")
+                         (.substring file-name 0)
+                         (Integer/parseInt))))
+                (bjitcask.core/data-files (:fs bc)))
         active-file (last files)
         files (drop-last files)
         kd-yield (dissoc (calculate-yield-per-file (bjitcask.core/keydir (:keydir bc)))
