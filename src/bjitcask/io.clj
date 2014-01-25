@@ -150,20 +150,32 @@
         (core/scan fs file 0 (.length file)))
       (scan [fs file offset length]
         (log/debug (format "Scanning %s from %d to %d" file offset length))
-        (let [channel
+        ;;TODO: determine if map-values is safe, because it's a ~10-15us
+        ;;penalty to have the feature flag, bringing reads from 60us to 75us
+        ;;when in map mode
+        (let [map-values? (:map-values? config)
+              channel
               (-> file
                   (RandomAccessFile. "r")
                   (.getChannel))
-              buf (java.nio.ByteBuffer/allocate length)
-              bytes-read (.. channel
-                             (position offset)
-                             (.read buf))
+              buf (if map-values?
+                    (.map channel
+                          java.nio.channels.FileChannel$MapMode/READ_ONLY
+                          offset
+                          length)
+                    (java.nio.ByteBuffer/allocate length))
+              bytes-read (when-not map-values?
+                           (.. channel
+                               (position offset)
+                               (read buf)))
+              ;; TODO: these marshalling steps may be pointless now
               bytes
               (-> buf
                   (gio/to-buf-seq)
                   (gloss.data.bytes/take-bytes length))]
           (.close channel)
-          (assert (= length bytes-read) "Read corrupted!")
+          (when-not map-values?
+            (assert (= length bytes-read) "Read corrupted!"))
           bytes))
       (create [_]
         (let [id (swap! largest-int inc)

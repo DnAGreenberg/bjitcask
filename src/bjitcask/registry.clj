@@ -15,6 +15,7 @@
          :as config}
         ;;NB: keep in sync with bjitcask.clj
         (merge {:max-data-file-size 1000000000
+                :map-values? false
                 :merge-frequency 300
                 :merge-fragmentation-threshold 0.7}
                config)  
