@@ -164,10 +164,11 @@
                           offset
                           length)
                     (java.nio.ByteBuffer/allocate length))
-              bytes-read (when-not map-values?
-                           (.. channel
-                               (position offset)
-                               (read buf)))
+              _ (when-not map-values?
+                  (.. channel
+                      (position offset)
+                      (read buf))
+                  (.flip buf))
               ;; TODO: these marshalling steps may be pointless now
               bytes
               (-> buf
@@ -175,7 +176,7 @@
                   (gloss.data.bytes/take-bytes length))]
           (.close channel)
           (when-not map-values?
-            (assert (= length bytes-read) "Read corrupted!"))
+            (assert (= length (.limit buf)) (format "Read corrupted! Expected %d bytes, got %d bytes" length (.limit buf))))
           bytes))
       (create [_]
         (let [id (swap! largest-int inc)
