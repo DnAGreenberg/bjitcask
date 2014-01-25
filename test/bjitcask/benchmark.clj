@@ -24,10 +24,9 @@
                                      500000))))]
     (println)
     (println "Benchmarking puts")
-  (crit/quick-bench (put db (rand-nth sample-set) (rand-nth value-set))) 
-    (println)
+    (crit/quick-bench (put db (rand-nth sample-set) (rand-nth value-set))) 
     (println "Benchmarking gets")
-  (crit/quick-bench (get db (rand-nth sample-set)))))
+    (crit/quick-bench (get db (rand-nth sample-set)))))
 
 (defn -main
   "Runs a full benchmark suite"

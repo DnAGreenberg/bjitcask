@@ -154,13 +154,16 @@
               (-> file
                   (RandomAccessFile. "r")
                   (.getChannel))
+              buf (java.nio.ByteBuffer/allocate length)
+              bytes-read (.. channel
+                             (position offset)
+                             (.read buf))
               bytes
-              (-> channel
-                  (.position offset)
-                  (byte-streams/convert (byte-streams/seq-of ByteBuffer))
+              (-> buf
                   (gio/to-buf-seq)
                   (gloss.data.bytes/take-bytes length))]
           (.close channel)
+          (assert (= length bytes-read) "Read corrupted!")
           bytes))
       (create [_]
         (let [id (swap! largest-int inc)
