@@ -16,20 +16,18 @@
         stop-chan (async/chan)]
     (async/go
       (loop [file (core/create fs)
-             curr-offset 0
-             hint-crc32 (java.util.zip.CRC32.)]
+             curr-offset 0]
         (async/alt!
           stop-chan ([_]
                      (async/close! put-chan)
-                     (recur file curr-offset hint-crc32))
+                     (recur file curr-offset))
           put-chan ([{:keys [ack-chan] :as command}]
                     (if command
                       (let [[file offset]
                             (process-command fs file curr-offset command chm)]
                         (async/close! ack-chan)
-                        (doto hint-crc32 (.update hint-buf))    
-                        (recur file offset hint-crc32))
-                    (core/close! file)))))
+                        (recur file offset))
+                    (core/close! file))))))
       (reify
         bjitcask.core.Bitcask
       (keydir [kd]
@@ -120,9 +118,9 @@
   [fs data-file]
   (let [hint-file (core/hint-file fs data-file)]
     (if hint-file
-      (do (log/info "Loading hint %s into keydir" (.getPath hint-file))
+      (do (log/info (format "Loading hint %s into keydir" (.getPath hint-file)))
           (hint->keydir-entry fs data-file hint-file))
-      (do (log/info "Loading data %s into keydir" (.getPath data-file))
+      (do (log/info (format "Loading data %s into keydir" (.getPath data-file)))
           (codecs/decode-all-keydir-entries data-file)))))
 
 (defn init

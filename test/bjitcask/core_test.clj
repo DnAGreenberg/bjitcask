@@ -1,7 +1,10 @@
 (ns bjitcask.core-test
   (:use clojure.test)
   (:require [bjitcask.registry]
-            [byte-streams]))
+            [byte-streams]
+            [clj-logging-config.log4j :refer (set-logger!)]))
+
+(set-logger! (org.apache.log4j.Logger/getRootLogger) :level :warn)
 
 (defmacro ms-time [& body]
   `(let [now# (System/currentTimeMillis)]
@@ -37,7 +40,10 @@
     (doseq [[k v] (map vector sample-set value-set)
             :let [v' (bjitcask.core/get (:keydir my-bc) k)]]
       (is v' (str "Key " k  " is nil"))
-      (is (byte-streams/bytes= v v')))
+      (is (byte-streams/bytes= v v')
+          (format "(count v) = %d, (count v') = %d"
+                  (count v)   
+                  (bjitcask.codecs/byte-count v'))))
 
     (bjitcask.merge/process-bitcask my-bc config)
     (doseq [[k v] (map vector sample-set value-set)

@@ -12,12 +12,16 @@
    - `merge-fragmentation-threshold` determines which logs are garbage collected
    "
   [directory {:keys [max-data-file-size
+                     map-values?
                      merge-frequency
                      merge-fragmentation-threshold]
+              ;;NB: keep in sync with registry.clj
               :or {max-data-file-size 1000000000
+                   map-values? false
                    merge-frequency 300
-                   merge-fragmentation-threshold 0.7}}]
-  (bjitcask.registry/open directory))
+                   merge-fragmentation-threshold 0.7}
+              :as config}]
+  (bjitcask.registry/open directory config))
 
 (defn close
   "Gracefully closes the given bjitcask."
