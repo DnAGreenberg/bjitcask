@@ -16,20 +16,22 @@
         stop-chan (async/chan)]
     (async/go
       (loop [file (core/create fs)
-             curr-offset 0]
+             curr-offset 0
+             hint-crc32 (java.util.zip.CRC32.)]
         (async/alt!
           stop-chan ([_]
                      (async/close! put-chan)
-                     (recur file curr-offset))
+                     (recur file curr-offset hint-crc32))
           put-chan ([{:keys [ack-chan] :as command}]
                     (if command
                       (let [[file offset]
                             (process-command fs file curr-offset command chm)]
                         (async/close! ack-chan)
-                        (recur file offset))
-                      (core/close! file))))))
-    (reify
-      bjitcask.core.Bitcask
+                        (doto hint-crc32 (.update hint-buf))    
+                        (recur file offset hint-crc32))
+                    (core/close! file)))))
+      (reify
+        bjitcask.core.Bitcask
       (keydir [kd]
         (into {} chm))
       (inject [kd k kde]

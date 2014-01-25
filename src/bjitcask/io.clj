@@ -27,87 +27,16 @@
     (.close hint)))
 
 (defn get-file-offset-or-rollover
-  [file curr-offset data-size fs]
+  [file curr-offset data-size fs hint-crc32]
   (if (> (+ data-size 
             (core/data-size file))
          (get-in file [:config :max-data-file-size]))
-    (do (core/close! file)
-        (log/info (format "Roll over data file. Size was %d, overflower was %d" curr-offset data-size))
-        [(core/create fs) 0])
-    [file curr-offset]))
-
-(comment
-  (mapv (fn [{:keys [key value tstamp]}]
-          (byte-streams/print-bytes key)
-          (byte-streams/print-bytes value)
-          (println (java.util.Date. (* 1000 tstamp))))
-        (decode-all-entries
-          (-> (File. "/tmp/bc.iterator.test.fold/1.bitcask.data")
-              (RandomAccessFile. "r")
-              (.getChannel)
-              (.position 0)
-              ;; TODO: limit length here
-              (byte-streams/convert (byte-streams/seq-of ByteBuffer))
-              )
-          ))
-
-  (mapv (fn [{:keys [key value tstamp]}]
-          (byte-streams/print-bytes key)
-          (byte-streams/print-bytes value)
-          (println (java.util.Date. (* 1000 tstamp))))
-        (-> (File. "/Users/dgrnbrg/bjitcask/bctest/2.bitcask.data")
-            (RandomAccessFile. "r")
-            (.getChannel)
-            (.position 0)
-            ;; TODO: limit length here
-            (byte-streams/convert (byte-streams/seq-of ByteBuffer))
-            (decode-all-entries)
-            ))
-
-  (-> (File. "/tmp/bc.iterator.test.fold/1.bitcask.hint")
-      (RandomAccessFile. "r")
-      (.getChannel)
-      (.position 0)
-      ;; TODO: limit length here
-      (byte-streams/convert (byte-streams/seq-of ByteBuffer))
-      (decode-all-hints)
-      clojure.pprint/pprint
-      )
-
-  
-
-)
-
-(comment
-  (def e1 {:key (byte-array 10) :value (byte-array 22) :tstamp 7})
-
-  (decode-entry (encode-entry core/->Entry
-                              (byte-array 10)
-                              (byte-array 22)
-                              7))
-
-  (decode-entry (encode-entry e1))
-
-  ;; roundtrip
-  (let [{:keys [key value tstamp]} (decode-entry (encode-entry e1))]
-    (assert (= key (gloss.data.bytes.core/create-buf-seq
-                     (ByteBuffer/wrap (:key e1)))))
-    (assert (= value (gloss.data.bytes.core/create-buf-seq
-                       (ByteBuffer/wrap (:value e1)))))
-    (assert (= tstamp (:tstamp e1))))
-
-  ;; check
-  (let [[b] (encode-entry e1)
-        _ (.put b 0 (byte (inc (.get b 0))))]
-    (decode-entry [b]))
-
-  (def buf (gio/encode bitcask-entry (assoc e1 :crc32 22)))
-  (bitcask-crc32 buf)
-  (gio/decode bitcask-entry buf)
-
-  (byte-str/k)
-
-  )
+    (do 
+      (core/append-hint file (codecs/encode-hint (core/->HintEntry (byte-array 0) (long 0x7fffffffffffffff) (.getValue hint-crc32) 0)))
+      (core/close! file) 
+      (log/info (format "Roll over data file. Size was %d, overflower was %d" curr-offset data-size))
+      [(core/create fs) 0 (java.util.zip.CRC32.)])
+    [file curr-offset hint-crc32]))
 
 (defn data-files
   [^File dir]
@@ -169,3 +98,73 @@
               data (.getChannel (RandomAccessFile. data-file "rw"))
               hint (.getChannel (RandomAccessFile. hint-file "rw"))]
           (->DataFile data data-file hint (atom 0) config))))))
+
+(comment
+  (mapv (fn [{:keys [key value tstamp]}]
+          (byte-streams/print-bytes key)
+          (byte-streams/print-bytes value)
+          (println (java.util.Date. (* 1000 tstamp))))
+        (decode-all-entries
+          (-> (File. "/tmp/bc.iterator.test.fold/1.bitcask.data")
+              (RandomAccessFile. "r")
+              (.getChannel)
+              (.position 0)
+              ;; TODO: limit length here
+              (byte-streams/convert (byte-streams/seq-of ByteBuffer))
+              )
+          ))
+
+  (mapv (fn [{:keys [key value tstamp]}]
+          (byte-streams/print-bytes key)
+          (byte-streams/print-bytes value)
+          (println (java.util.Date. (* 1000 tstamp))))
+        (-> (File. "/Users/dgrnbrg/bjitcask/bctest/2.bitcask.data")
+            (RandomAccessFile. "r")
+            (.getChannel)
+            (.position 0)
+            ;; TODO: limit length here
+            (byte-streams/convert (byte-streams/seq-of ByteBuffer))
+            (decode-all-entries)
+            ))
+
+  (-> (File. "/tmp/bc.iterator.test.fold/1.bitcask.hint")
+      (RandomAccessFile. "r")
+      (.getChannel)
+      (.position 0)
+      ;; TODO: limit length here
+      (byte-streams/convert (byte-streams/seq-of ByteBuffer))
+      (decode-all-hints)
+      clojure.pprint/pprint
+      )
+  ) 
+
+(comment
+  (def e1 {:key (byte-array 10) :value (byte-array 22) :tstamp 7})
+
+  (decode-entry (encode-entry core/->Entry
+                              (byte-array 10)
+                              (byte-array 22)
+                              7))
+
+  (decode-entry (encode-entry e1))
+
+  ;; roundtrip
+  (let [{:keys [key value tstamp]} (decode-entry (encode-entry e1))]
+    (assert (= key (gloss.data.bytes.core/create-buf-seq
+                     (ByteBuffer/wrap (:key e1)))))
+    (assert (= value (gloss.data.bytes.core/create-buf-seq
+                       (ByteBuffer/wrap (:value e1)))))
+    (assert (= tstamp (:tstamp e1))))
+
+  ;; check
+  (let [[b] (encode-entry e1)
+        _ (.put b 0 (byte (inc (.get b 0))))]
+    (decode-entry [b]))
+
+  (def buf (gio/encode bitcask-entry (assoc e1 :crc32 22)))
+  (bitcask-crc32 buf)
+  (gio/decode bitcask-entry buf)
+
+  (byte-str/k)
+
+  ) 
