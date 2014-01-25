@@ -30,6 +30,7 @@
   [file curr-offset data-size fs]
   (if (> (+ data-size 
             (core/data-size file))
+         ;TODO: got NPE here?
          (get-in file [:config :max-data-file-size]))
     (do (core/close! file)
         (log/info (format "Roll over data file. Size was %d, overflower was %d" curr-offset data-size))

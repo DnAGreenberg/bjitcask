@@ -12,5 +12,7 @@
   :profiles {:dev {:dependencies [[criterium "0.4.2"]
                                   [org.clojure/java.jdbc "0.3.2"]
                                   ;[h2database/h2 "1.3.175"]
-                                  [factual/clj-leveldb "0.1.0"]]}})
+                                  [factual/clj-leveldb "0.1.0"]]
+                   :main bjitcask.benchmark
+                   :aliases {"bench" "run" "-m" "bjitcask.benchmark"}}})
 

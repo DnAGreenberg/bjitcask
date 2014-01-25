@@ -8,14 +8,17 @@
 
 (defn open
   "Opens a bitcask in the given directory"
-  [dir {:as config
-        :keys [max-data-file-size
-               merge-frequency
-               merge-fragmentation-threshold]
-        :or {max-data-file-size 1000000000
-             merge-frequency 300
-             merge-fragmentation-threshold 0.7}}]
-  (let [dir (clojure.java.io/file dir)]
+  [dir config]
+  (let [{:keys [max-data-file-size
+                merge-frequency
+                merge-fragmentation-threshold]
+         :as config}
+        ;;NB: keep in sync with bjitcask.clj
+        (merge {:max-data-file-size 1000000000
+                :merge-frequency 300
+                :merge-fragmentation-threshold 0.7}
+               config)  
+        dir (clojure.java.io/file dir)]
     (if-not (.exists dir)
       (do (log/debug (format "mkdir %s" (.getPath dir)))
           (.mkdirs dir)))

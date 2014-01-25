@@ -79,7 +79,7 @@
                      (mapcat (fn [[file [size entries]]]
                                entries)))]
     (doseq [file stale-files]
-      (log/info (format "Deleting %s due to no active data remaining") (.getPath file))
+      (log/info (format "Deleting %s due to no active data remaining" (.getPath file)))
       (.delete file))
     (loop [[entry & entries] entries
            file (bjitcask.core/create (:fs bc))

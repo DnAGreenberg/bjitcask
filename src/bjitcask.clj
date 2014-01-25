@@ -14,10 +14,12 @@
   [directory {:keys [max-data-file-size
                      merge-frequency
                      merge-fragmentation-threshold]
+              ;;NB: keep in sync with registry.clj
               :or {max-data-file-size 1000000000
                    merge-frequency 300
-                   merge-fragmentation-threshold 0.7}}]
-  (bjitcask.registry/open directory))
+                   merge-fragmentation-threshold 0.7}
+              :as config}]
+  (bjitcask.registry/open directory config))
 
 (defn close
   "Gracefully closes the given bjitcask."
