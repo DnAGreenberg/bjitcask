@@ -149,7 +149,7 @@
       (scan [fs file]
         (core/scan fs file 0 (.length file)))
       (scan [fs file offset length]
-        (log/debug (format "Scanning %s from %d to %d" file offset length))
+        (log/debug (format "Scanning %s from %d for %d bytes" file offset length))
         ;;TODO: determine if map-values is safe, because it's a ~10-15us
         ;;penalty to have the feature flag, bringing reads from 60us to 75us
         ;;when in map mode
