@@ -169,11 +169,7 @@
                       (position offset)
                       (read buf))
                   (.flip buf))
-              ;; TODO: these marshalling steps may be pointless now
-              bytes
-              (-> buf
-                  (gio/to-buf-seq)
-                  (gloss.data.bytes/take-bytes length))]
+              bytes (gio/to-buf-seq buf)]
           (.close channel)
           (when-not map-values?
             (assert (= length (.limit buf)) (format "Read corrupted! Expected %d bytes, got %d bytes" length (.limit buf))))
