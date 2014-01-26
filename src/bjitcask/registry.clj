@@ -46,7 +46,8 @@
 
 (defn close
   [bc]
-  (log/info (format "Closing Bjitcask %s" (-> bc :dir .getPath)))
+  (let [^java.io.File dir (:dir bc)]
+    (log/info (format "Closing Bjitcask %s" (.getPath dir))))
   (swap! registry-atom dissoc (:dir bc))
   (async/close! (:stop-merge bc))
   (bjitcask.core/close! (:keydir bc)))

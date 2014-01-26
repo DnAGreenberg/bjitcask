@@ -5,7 +5,9 @@
             [gloss.core :as gloss]
             [gloss.io :as gio]
             gloss.data.bytes.core)
-  (:import java.util.concurrent.locks.ReentrantReadWriteLock))
+  (:import java.util.concurrent.locks.ReentrantReadWriteLock
+           java.nio.ByteBuffer
+           java.util.zip.CRC32))
 
 (defn to-bytes
   "Converts arg to internal bytes representation."
@@ -44,7 +46,7 @@
   (when bufs
     (let [{:keys [keysz valsz]} (gio/decode bitcask-entry-header bufs false)
           b (byte-array core/page-size)
-          crc32 (java.util.zip.CRC32.)
+          crc32 (CRC32.)
           final-total (+ 10 keysz valsz) ; 10 instead of 14 because we leave off the crc32
           bufs (-> bufs
                    (gloss.data.bytes/drop-bytes 4) ; skip crc32 
@@ -53,17 +55,18 @@
       (doseq [b (if (seq? bufs)
                   bufs
                   [bufs])]
-        (.update crc32 b))
+        (.update crc32 ^bytes b))
       (.getValue crc32))))
 
 (defn encode-entry
   [entry]
-  (let [buf (gio/encode bitcask-entry (assoc entry
-                                             :crc32 0))
+  ;;TODO: figure out how to type hint `h` successfully
+  (let [[h :as buf] (gio/encode bitcask-entry (assoc entry
+                                                                 :crc32 0))
         crc32 (bitcask-crc32 buf)]
-    (.mark (first buf))
-    (.putInt (first buf) crc32)
-    (.reset (first buf))
+    (.mark h)
+    (.putInt h crc32)
+    (.reset h)
     buf))
 
 (defn decode-entry

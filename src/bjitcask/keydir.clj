@@ -5,14 +5,16 @@
             [bjitcask.io :as io]
             [bjitcask.codecs :as codecs]
             [clojure.core.async :as async])
-  (:import java.util.concurrent.locks.ReentrantReadWriteLock)) 
+  (:import java.util.concurrent.locks.ReentrantReadWriteLock
+           java.io.File
+           java.util.Map)) 
 
 (declare process-command)
 
 (defn create-keydir
   "Creates a keydir." 
   [fs init-dir config]
-  (let [chm (java.util.concurrent.ConcurrentHashMap. init-dir)
+  (let [chm (java.util.concurrent.ConcurrentHashMap. ^Map init-dir)
         put-chan (async/chan)
         stop-chan (async/chan)]
     (async/go
@@ -38,7 +40,7 @@
       (get [kd key]
         (core/get kd key nil))
       (get [_ key not-found]
-        (let [lock (:lock (.get chm key))
+        (let [^ReentrantReadWriteLock lock (:lock (.get chm key))
               value-bytes
               (when lock (.. lock readLock lock)
                 (try
@@ -73,7 +75,7 @@
       (close! [_] (async/close! stop-chan)))))
 
 (defn handle-keydir-data-hint-entries
-  [key value fs file curr-offset chm]
+  [key value fs file curr-offset ^Map chm]
   (let [old-keydir-entry (.get chm key)
         key-buf (codecs/to-bytes key)
         val-buf (codecs/to-bytes value)
@@ -129,9 +131,9 @@
   [fs data-file]
   (let [hint-file (core/hint-file fs data-file)]
     (if hint-file
-      (do (log/info (format "Loading hint %s into keydir" (.getPath hint-file)))
+      (do (log/info (format "Loading hint %s into keydir" (.getPath ^File hint-file)))
           (hint->keydir-entry fs data-file hint-file))
-      (do (log/info (format "Loading data %s into keydir" (.getPath data-file)))
+      (do (log/info (format "Loading data %s into keydir" (.getPath ^File data-file)))
           (codecs/decode-all-keydir-entries data-file)))))
 
 (defn init
@@ -140,7 +142,7 @@
   (let  [chm (java.util.HashMap.)
          ; data files in order from oldest first
          data-files (sort-by
-                      (fn [file]
+                      (fn [^File file]
                         (let [file-name (.getName file)]
                           (->> (.indexOf file-name ".")
                                (.substring file-name 0)
@@ -148,7 +150,7 @@
                       (core/data-files fs))]
     (->> data-files
          (mapcat (partial list-keydir-entries fs))
-         (reduce (fn [chm entry] (doto chm
+         (reduce (fn [chm entry] (doto ^Map chm
                                    (.put (byte-streams/to-string (:key entry)) entry)))
                  chm))))
 

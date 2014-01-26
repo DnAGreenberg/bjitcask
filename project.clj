@@ -4,6 +4,7 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :jvm-opts ^:replace ["-XX:-OmitStackTraceInFastThrow" "-server" "-Xmx2g"]
+  :warn-on-reflection true
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [org.clojure/tools.logging "0.2.6"]
                  [byte-streams "0.1.7"]
