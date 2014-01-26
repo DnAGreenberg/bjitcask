@@ -4,7 +4,8 @@
             potemkin
             [gloss.core :as gloss]
             [gloss.io :as gio]
-            gloss.data.bytes.core))
+            gloss.data.bytes.core)
+  (:import java.util.concurrent.locks.ReentrantReadWriteLock))
 
 (defn to-bytes
   "Converts arg to internal bytes representation."
@@ -93,7 +94,8 @@
                                                  data-file
                                                  value-offset
                                                  valsz
-                                                 tstamp)]
+                                                 tstamp
+                                                 (ReentrantReadWriteLock.))]
             (assert (= crc32 (bit-and 0xffffffff (:crc32 entry))))
             (recur remainder (conj keydir-entries keydir-entry) (+ curr-offset entry-len)))
           keydir-entries)))))

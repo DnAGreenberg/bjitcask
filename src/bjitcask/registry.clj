@@ -19,7 +19,7 @@
                 :merge-frequency 300
                 :merge-fragmentation-threshold 0.7}
                config)  
-        dir (clojure.java.io/file dir)]
+        dir (.getAbsoluteFile (clojure.java.io/file dir))]
     (if-not (.exists dir)
       (do (log/debug (format "mkdir %s" (.getPath dir)))
           (.mkdirs dir)))

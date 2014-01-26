@@ -85,6 +85,7 @@
            file (bjitcask.core/create (:fs bc))
            curr-offset 0]
       (when entry
+        (log/debug (format "Preparing to copy entry %s" (pr-str entry)))
         (let [data-buf (get-data-buf-from-keydir-entry (:fs bc) entry)
               ;; This creates a new data file segment if the old one was full
               [file curr-offset]
@@ -100,7 +101,8 @@
                                                (:data-file file)
                                                value-offset
                                                (:value-len entry)
-                                               (:tstamp entry))] 
+                                               (:tstamp entry)
+                                               (:lock entry))] 
           (bjitcask.core/append-data file data-buf)
           (bjitcask.core/append-hint file hint-buf)
           (bjitcask.core/inject (:keydir bc) (:key kde) kde)
@@ -110,7 +112,11 @@
       (log/info (format "Deleting %s due to kd-yield of %f"
                         (.getPath file)
                         (float (/ size (.length file)))))
-      (.delete file))
+      (doseq [{:keys [lock]} entries]
+        (.. lock writeLock lock))
+      (.delete file)
+      (doseq [{:keys [lock]} entries]
+        (.. lock writeLock unlock)))
     (doseq [file (->> (bjitcask.core/hint-files (:fs bc))
                       (remove (->> (bjitcask.core/data-files (:fs bc))
                                    (map #(bjitcask.core/hint-file (:fs bc) %))

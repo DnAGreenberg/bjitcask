@@ -4,7 +4,8 @@
             [clojure.tools.logging :as log]
             [bjitcask.io :as io]
             [bjitcask.codecs :as codecs]
-            [clojure.core.async :as async]))
+            [clojure.core.async :as async])
+  (:import java.util.concurrent.locks.ReentrantReadWriteLock)) 
 
 (declare process-command)
 
@@ -37,16 +38,22 @@
       (get [kd key]
         (core/get kd key nil))
       (get [_ key not-found]
-        (let [keydir-value (.get chm key)
-              data-file (:file keydir-value)
-              value-offset (:value-offset keydir-value)
-              value-len (:value-len keydir-value)
-              value-bytes (core/scan fs
-                                     data-file
-                                     value-offset
-                                     value-len)]
+        (let [lock (:lock (.get chm key))
+              value-bytes
+              (when lock (.. lock readLock lock)
+                (try
+                  (let [keydir-value (.get chm key)
+                        data-file (:file keydir-value)
+                        value-offset (:value-offset keydir-value)
+                        value-len (:value-len keydir-value)]
+                    (core/scan fs
+                               data-file
+                               value-offset
+                               value-len))
+                  (finally
+                    (.. lock readLock unlock))))]
 
-          (if (and keydir-value
+          (if (and value-bytes
                    ; TODO aysylu: refactor out the hard-coded tombstone value into config
                    (not (byte-streams/bytes= "bitcask_tombstone" value-bytes)))
             value-bytes 
@@ -67,7 +74,8 @@
 
 (defn handle-keydir-data-hint-entries
   [key value fs file curr-offset chm]
-  (let [key-buf (codecs/to-bytes key)
+  (let [old-keydir-entry (.get chm key)
+        key-buf (codecs/to-bytes key)
         val-buf (codecs/to-bytes value)
         key-len (codecs/byte-count key-buf)
         val-len (codecs/byte-count val-buf)
@@ -90,7 +98,9 @@
                                          (:data-file file)
                                          val-offset
                                          val-len
-                                         now)]
+                                         now
+                                         (or (:lock old-keydir-entry)
+                                             (ReentrantReadWriteLock.)))]
     (core/append-data file data-buf)
     (core/append-hint file hint-buf)
     (.put chm key keydir-entry) 
@@ -110,7 +120,8 @@
          (let [key-len (codecs/byte-count key)
                value-len (- total-len core/header-size key-len)
                value-offset (+ offset core/header-size key-len)]
-           (core/->KeyDirEntry key data-file value-offset value-len tstamp)))
+           (core/->KeyDirEntry key data-file value-offset value-len tstamp
+                               (ReentrantReadWriteLock.))))
        (codecs/decode-all-hints (core/scan fs hint-file))))
 
 (defn list-keydir-entries
