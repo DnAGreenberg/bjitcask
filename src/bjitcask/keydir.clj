@@ -28,9 +28,9 @@
                             (process-command fs file curr-offset command chm)]
                         (async/close! ack-chan)
                         (recur file offset))
-                      (core/close! file))))))
-    (reify
-      bjitcask.core.Bitcask
+                    (core/close! file))))))
+      (reify
+        bjitcask.core.Bitcask
       (keydir [kd]
         (into {} chm))
       (inject [kd k kde]

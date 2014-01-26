@@ -32,10 +32,24 @@
             (core/data-size file))
          ;TODO: got NPE here?
          (get-in file [:config :max-data-file-size]))
-    (do (core/close! file)
-        (log/info (format "Roll over data file. Size was %d, overflower was %d" curr-offset data-size))
-        [(core/create fs) 0])
+    (do 
+      ;(core/append-hint file (codecs/encode-hint (core/->HintEntry (byte-array 0) (long 0x7fffffffffffffff) (.getValue hint-crc32) 0)))
+      (core/close! file) 
+      (log/info (format "Roll over data file. Size was %d, overflower was %d" curr-offset data-size))
+      [(core/create fs) 0 (java.util.zip.CRC32.)])
     [file curr-offset]))
+
+(defn data-files
+  [^File dir]
+  (.listFiles dir (reify FilenameFilter
+                    (accept [_ _ name]
+                      (.endsWith name ".bitcask.data")))))
+
+(defn hint-files
+  [^File dir]
+  (.listFiles dir (reify FilenameFilter
+                    (accept [_ _ name]
+                      (.endsWith name ".bitcask.hint")))))
 
 (comment
   (mapv (fn [{:keys [key value tstamp]}]
@@ -74,10 +88,7 @@
       (decode-all-hints)
       clojure.pprint/pprint
       )
-
-  
-
-)
+  ) 
 
 (comment
   (def e1 {:key (byte-array 10) :value (byte-array 22) :tstamp 7})
@@ -109,18 +120,6 @@
   (byte-str/k)
 
   )
-
-(defn data-files
-  [^File dir]
-  (.listFiles dir (reify FilenameFilter
-                    (accept [_ _ name]
-                      (.endsWith name ".bitcask.data")))))
-
-(defn hint-files
-  [^File dir]
-  (.listFiles dir (reify FilenameFilter
-                    (accept [_ _ name]
-                      (.endsWith name ".bitcask.hint")))))
 
 (defn open
   "Takes a directory and opens the bitcask inside."
