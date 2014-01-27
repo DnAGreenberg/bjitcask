@@ -7,6 +7,7 @@
   :warn-on-reflection true
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [org.clojure/tools.logging "0.2.6"]
+                 [byte-transforms "0.1.1"]
                  [byte-streams "0.1.7"]
                  [org.clojure/core.async "0.1.267.0-0d7780-alpha"]
                  [gloss "0.2.2"]]

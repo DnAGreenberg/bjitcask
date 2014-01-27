@@ -1,6 +1,7 @@
 (ns bjitcask.keydir
   (:require [bjitcask.core :as core]
             byte-streams
+            byte-transforms
             [clojure.tools.logging :as log]
             [bjitcask.io :as io]
             [bjitcask.codecs :as codecs]
@@ -10,6 +11,20 @@
            java.util.Map)) 
 
 (declare process-command)
+
+(deftype BinaryKey [bytes hash]
+  Object
+  (hashCode [this]
+    hash)
+  (equals [this other]
+    (and (instance? BinaryKey other)
+         (= hash (.hash ^BinaryKey other))
+         (byte-streams/bytes= bytes (.bytes ^BinaryKey other)))))
+
+(defn make-binary-key
+  [buf]
+  (->BinaryKey (byte-streams/to-byte-buffer buf)
+               (byte-transforms/hash buf :murmur64)))
 
 (defn create-keydir
   "Creates a keydir." 
@@ -36,11 +51,12 @@
       (keydir [kd]
         (into {} chm))
       (inject [kd k kde]
-        (.put chm k kde))
+        (.put chm (make-binary-key k) kde))
       (get [kd key]
         (core/get kd key nil))
       (get [_ key not-found]
-        (let [^ReentrantReadWriteLock lock (:lock (.get chm key))
+        (let [key (make-binary-key key)
+              ^ReentrantReadWriteLock lock (:lock (.get chm key))
               value-bytes
               (when lock (.. lock readLock lock)
                 (try
@@ -76,7 +92,8 @@
 
 (defn handle-keydir-data-hint-entries
   [key value fs file curr-offset ^Map chm]
-  (let [old-keydir-entry (.get chm key)
+  (let [bkey (make-binary-key key)
+        old-keydir-entry (.get chm bkey)
         key-buf (codecs/to-bytes key)
         val-buf (codecs/to-bytes value)
         key-len (codecs/byte-count key-buf)
@@ -105,7 +122,9 @@
                                              (ReentrantReadWriteLock.)))]
     (core/append-data file data-buf)
     (core/append-hint file hint-buf)
-    (.put chm key keydir-entry) 
+    (.put chm (or (:key old-keydir-entry)
+                  bkey)
+          keydir-entry) 
     [file (+ curr-offset total-len)]))
 
 (defn process-command
@@ -150,8 +169,9 @@
                       (core/data-files fs))]
     (->> data-files
          (mapcat (partial list-keydir-entries fs))
-         (reduce (fn [chm entry] (doto ^Map chm
-                                   (.put (byte-streams/to-string (:key entry)) entry)))
+         (reduce (fn [chm entry]
+                   (doto ^Map chm
+                     (.put (make-binary-key (:key entry)) entry)))
                  chm))))
 
 (comment
