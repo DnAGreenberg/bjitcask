@@ -9,7 +9,7 @@
            [java.nio ByteBuffer]
            [java.util Arrays]))
 
-(defrecord DataFile [data data-file hint active-size config]
+(defrecord DataFile [data data-file hint hint-crc32 active-size config]
   core/IDataWriter
   (data-size [this]
     @active-size)
@@ -20,6 +20,7 @@
         (.write data buf))))
   (append-hint [this bufs]
     (doseq [buf bufs]
+      (.update hint-crc32 (byte-streams/to-byte-array buf))
       (.write hint buf)))
   core/IClose
   (close! [this]
@@ -33,7 +34,12 @@
          ;TODO: got NPE here?
          (get-in file [:config :max-data-file-size]))
     (do 
-      ;(core/append-hint file (codecs/encode-hint (core/->HintEntry (byte-array 0) (long 0x7fffffffffffffff) (.getValue hint-crc32) 0)))
+      (core/append-hint file
+                        (codecs/encode-hint
+                          (core/->HintEntry (codecs/to-bytes (byte-array 0))
+                                            -1
+                                            (.getValue (:hint-crc32 file))
+                                            0)))
       (core/close! file) 
       (log/info (format "Roll over data file. Size was %d, overflower was %d" curr-offset data-size))
       [(core/create fs) 0 (java.util.zip.CRC32.)])
@@ -184,4 +190,4 @@
               hint-file (File. dir (str id ".bitcask.hint"))
               data (.getChannel (RandomAccessFile. data-file "rw"))
               hint (.getChannel (RandomAccessFile. hint-file "rw"))]
-          (->DataFile data data-file hint (atom 0) config))))))
+          (->DataFile data data-file hint (java.util.zip.CRC32.) (atom 0) config))))))

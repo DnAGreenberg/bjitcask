@@ -105,21 +105,23 @@
 
 (defn hint->keydir-entry
   "Convert hints in the hint file to KeyDirEntries."
-  [fs data-file hint-file]
+  [fs data-file hints]
   (map (fn [{:keys [key offset total-len tstamp]}]
          (let [key-len (codecs/byte-count key)
                value-len (- total-len core/header-size key-len)
                value-offset (+ offset core/header-size key-len)]
            (core/->KeyDirEntry key data-file value-offset value-len tstamp)))
-       (codecs/decode-all-hints (core/scan fs hint-file))))
+       hints))
 
 (defn list-keydir-entries
   "Returns keydir entries for the data or hint file, if present."
   [fs data-file]
-  (let [hint-file (core/hint-file fs data-file)]
-    (if hint-file
+  (let [hint-file (core/hint-file fs data-file)
+        hints (when hint-file
+                (codecs/decode-all-hints (core/scan fs hint-file)))]
+    (if hints
       (do (log/info (format "Loading hint %s into keydir" (.getPath hint-file)))
-          (hint->keydir-entry fs data-file hint-file))
+          (hint->keydir-entry fs data-file hints))
       (do (log/info (format "Loading data %s into keydir" (.getPath data-file)))
           (codecs/decode-all-keydir-entries data-file)))))
 
