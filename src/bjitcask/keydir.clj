@@ -1,17 +1,35 @@
 (ns bjitcask.keydir
   (:require [bjitcask.core :as core]
             byte-streams
+            byte-transforms
             [clojure.tools.logging :as log]
             [bjitcask.io :as io]
             [bjitcask.codecs :as codecs]
-            [clojure.core.async :as async]))
+            [clojure.core.async :as async])
+  (:import java.util.concurrent.locks.ReentrantReadWriteLock
+           java.io.File
+           java.util.Map)) 
 
 (declare process-command)
+
+(deftype BinaryKey [bytes hash]
+  Object
+  (hashCode [this]
+    hash)
+  (equals [this other]
+    (and (instance? BinaryKey other)
+         (= hash (.hash ^BinaryKey other))
+         (byte-streams/bytes= bytes (.bytes ^BinaryKey other)))))
+
+(defn make-binary-key
+  [buf]
+  (->BinaryKey (byte-streams/to-byte-buffer buf)
+               (byte-transforms/hash buf :murmur64)))
 
 (defn create-keydir
   "Creates a keydir." 
   [fs init-dir config]
-  (let [chm (java.util.concurrent.ConcurrentHashMap. init-dir)
+  (let [chm (java.util.concurrent.ConcurrentHashMap. ^Map init-dir)
         put-chan (async/chan)
         stop-chan (async/chan)]
     (async/go
@@ -33,20 +51,27 @@
       (keydir [kd]
         (into {} chm))
       (inject [kd k kde]
-        (.put chm k kde))
+        (.put chm (make-binary-key k) kde))
       (get [kd key]
         (core/get kd key nil))
       (get [_ key not-found]
-        (let [keydir-value (.get chm key)
-              data-file (:file keydir-value)
-              value-offset (:value-offset keydir-value)
-              value-len (:value-len keydir-value)
-              value-bytes (core/scan fs
-                                     data-file
-                                     value-offset
-                                     value-len)]
+        (let [key (make-binary-key key)
+              ^ReentrantReadWriteLock lock (:lock (.get chm key))
+              value-bytes
+              (when lock (.. lock readLock lock)
+                (try
+                  (let [keydir-value (.get chm key)
+                        data-file (:file keydir-value)
+                        value-offset (:value-offset keydir-value)
+                        value-len (:value-len keydir-value)]
+                    (core/scan fs
+                               data-file
+                               value-offset
+                               value-len))
+                  (finally
+                    (.. lock readLock unlock))))]
 
-          (if (and keydir-value
+          (if (and value-bytes
                    ; TODO aysylu: refactor out the hard-coded tombstone value into config
                    (not (byte-streams/bytes= "bitcask_tombstone" value-bytes)))
             value-bytes 
@@ -66,8 +91,10 @@
       (close! [_] (async/close! stop-chan)))))
 
 (defn handle-keydir-data-hint-entries
-  [key value fs file curr-offset chm]
-  (let [key-buf (codecs/to-bytes key)
+  [key value fs file curr-offset ^Map chm]
+  (let [bkey (make-binary-key key)
+        old-keydir-entry (.get chm bkey)
+        key-buf (codecs/to-bytes key)
         val-buf (codecs/to-bytes value)
         key-len (codecs/byte-count key-buf)
         val-len (codecs/byte-count val-buf)
@@ -90,10 +117,14 @@
                                          (:data-file file)
                                          val-offset
                                          val-len
-                                         now)]
+                                         now
+                                         (or (:lock old-keydir-entry)
+                                             (ReentrantReadWriteLock.)))]
     (core/append-data file data-buf)
     (core/append-hint file hint-buf)
-    (.put chm key keydir-entry) 
+    (.put chm (or (:key old-keydir-entry)
+                  bkey)
+          keydir-entry) 
     [file (+ curr-offset total-len)]))
 
 (defn process-command
@@ -110,7 +141,8 @@
          (let [key-len (codecs/byte-count key)
                value-len (- total-len core/header-size key-len)
                value-offset (+ offset core/header-size key-len)]
-           (core/->KeyDirEntry key data-file value-offset value-len tstamp)))
+           (core/->KeyDirEntry key data-file value-offset value-len tstamp
+                               (ReentrantReadWriteLock.))))
        hints))
 
 (defn list-keydir-entries
@@ -120,9 +152,9 @@
         hints (when hint-file
                 (codecs/decode-all-hints (core/scan fs hint-file)))]
     (if hints
-      (do (log/info (format "Loading hint %s into keydir" (.getPath hint-file)))
+      (do (log/info (format "Loading hint %s into keydir" (.getPath ^File hint-file)))
           (hint->keydir-entry fs data-file hints))
-      (do (log/info (format "Loading data %s into keydir" (.getPath data-file)))
+      (do (log/info (format "Loading data %s into keydir" (.getPath ^File data-file)))
           (codecs/decode-all-keydir-entries data-file)))))
 
 (defn init
@@ -131,7 +163,7 @@
   (let  [chm (java.util.HashMap.)
          ; data files in order from oldest first
          data-files (sort-by
-                      (fn [file]
+                      (fn [^File file]
                         (let [file-name (.getName file)]
                           (->> (.indexOf file-name ".")
                                (.substring file-name 0)
@@ -139,8 +171,9 @@
                       (core/data-files fs))]
     (->> data-files
          (mapcat (partial list-keydir-entries fs))
-         (reduce (fn [chm entry] (doto chm
-                                   (.put (byte-streams/to-string (:key entry)) entry)))
+         (reduce (fn [chm entry]
+                   (doto ^Map chm
+                     (.put (make-binary-key (:key entry)) entry)))
                  chm))))
 
 (comment

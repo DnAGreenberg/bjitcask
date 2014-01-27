@@ -19,7 +19,7 @@
                 :merge-frequency 300
                 :merge-fragmentation-threshold 0.7}
                config)  
-        dir (clojure.java.io/file dir)]
+        dir (.getAbsoluteFile (clojure.java.io/file dir))]
     (if-not (.exists dir)
       (do (log/debug (format "mkdir %s" (.getPath dir)))
           (.mkdirs dir)))
@@ -46,7 +46,8 @@
 
 (defn close
   [bc]
-  (log/info (format "Closing Bjitcask %s" (-> bc :dir .getPath)))
+  (let [^java.io.File dir (:dir bc)]
+    (log/info (format "Closing Bjitcask %s" (.getPath dir))))
   (swap! registry-atom dissoc (:dir bc))
   (async/close! (:stop-merge bc))
   (bjitcask.core/close! (:keydir bc)))

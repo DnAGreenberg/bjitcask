@@ -7,9 +7,10 @@
             byte-streams)
   (:import [java.io RandomAccessFile File FilenameFilter]
            [java.nio ByteBuffer]
+           [java.nio.channels FileChannel]
            [java.util Arrays]))
 
-(defrecord DataFile [data data-file hint hint-crc32 active-size config]
+(defrecord DataFile [^FileChannel data data-file ^FileChannel hint hint-crc32 active-size config]
   core/IDataWriter
   (data-size [this]
     @active-size)
@@ -17,7 +18,7 @@
     (let [size (codecs/byte-count bufs)]
       (swap! active-size + size)
       (doseq [buf bufs]
-        (.write data buf))))
+        (.write data ^ByteBuffer buf))))
   (append-hint [this bufs]
     (doseq [buf bufs]
       (.update hint-crc32 (byte-streams/to-byte-array buf))
@@ -152,7 +153,7 @@
       (lock [_] "todo")
       (unlock [_ forec?] "todo")
       (scan [fs file]
-        (core/scan fs file 0 (.length file)))
+        (core/scan fs file 0 (.length ^File file)))
       (scan [fs file offset length]
         (log/debug (format "Scanning %s from %d for %d bytes" file offset length))
         ;;TODO: determine if map-values is safe, because it's a ~10-15us
@@ -160,25 +161,22 @@
         ;;when in map mode
         (let [map-values? (:map-values? config)
               channel
-              (-> file
+              (-> ^File file
                   (RandomAccessFile. "r")
                   (.getChannel))
-              buf (if map-values?
-                    (.map channel
-                          java.nio.channels.FileChannel$MapMode/READ_ONLY
-                          offset
-                          length)
-                    (java.nio.ByteBuffer/allocate length))
+              ^ByteBuffer buf
+              (if map-values?
+                (.map channel
+                      java.nio.channels.FileChannel$MapMode/READ_ONLY
+                      offset
+                      length)
+                (java.nio.ByteBuffer/allocate length))
               _ (when-not map-values?
                   (.. channel
-                      (position offset)
+                      (position (int offset))
                       (read buf))
                   (.flip buf))
-              ;; TODO: these marshalling steps may be pointless now
-              bytes
-              (-> buf
-                  (gio/to-buf-seq)
-                  (gloss.data.bytes/take-bytes length))]
+              bytes (gio/to-buf-seq buf)]
           (.close channel)
           (when-not map-values?
             (assert (= length (.limit buf)) (format "Read corrupted! Expected %d bytes, got %d bytes" length (.limit buf))))

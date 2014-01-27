@@ -20,7 +20,7 @@
 
 (defrecord Entry [key value ^long tstamp])
 (defrecord HintEntry [key ^long offset ^long total-len ^long tstamp])
-(defrecord KeyDirEntry [key file ^long value-offset ^long value-len ^long tstamp])
+(defrecord KeyDirEntry [key file ^long value-offset ^long value-len ^long tstamp lock])
 
 (defprotocol Bitcask
   (keydir [bitcask] "Returns a snapshot of the keydir")

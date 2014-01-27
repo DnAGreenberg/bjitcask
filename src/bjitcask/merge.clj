@@ -3,7 +3,8 @@
             [bjitcask.codecs :as codecs]
             [clojure.tools.logging :as log]
             byte-streams)
-  (:import java.io.File))
+  (:import java.util.concurrent.locks.ReentrantReadWriteLock
+           java.io.File))
 
 
 ;;We'll merge every n milliseconds
@@ -63,7 +64,7 @@
 (defn process-bitcask
   [bc config]
   (let [files (sort-by
-                (fn [file]
+                (fn [^File file]
                   (let [file-name (.getName file)]
                     (->> (.indexOf file-name ".")
                          (.substring file-name 0)
@@ -78,13 +79,14 @@
                      (sort-by (fn [[file [size entries]]] size))
                      (mapcat (fn [[file [size entries]]]
                                entries)))]
-    (doseq [file stale-files]
+    (doseq [^File file stale-files]
       (log/info (format "Deleting %s due to no active data remaining" (.getPath file)))
       (.delete file))
     (loop [[entry & entries] entries
            file (bjitcask.core/create (:fs bc))
            curr-offset 0]
       (when entry
+        (log/debug (format "Preparing to copy entry %s" (pr-str entry)))
         (let [data-buf (get-data-buf-from-keydir-entry (:fs bc) entry)
               ;; This creates a new data file segment if the old one was full
               [file curr-offset]
@@ -100,21 +102,26 @@
                                                (:data-file file)
                                                value-offset
                                                (:value-len entry)
-                                               (:tstamp entry))] 
+                                               (:tstamp entry)
+                                               (:lock entry))] 
           (bjitcask.core/append-data file data-buf)
           (bjitcask.core/append-hint file hint-buf)
           (bjitcask.core/inject (:keydir bc) (:key kde) kde)
           (recur entries file (+ value-offset
                                  (:value-len entry))))))
-    (doseq [[file [size entries]] kd-yield]
+    (doseq [[^File file [size entries]] kd-yield]
       (log/info (format "Deleting %s due to kd-yield of %f"
                         (.getPath file)
                         (float (/ size (.length file)))))
-      (.delete file))
-    (doseq [file (->> (bjitcask.core/hint-files (:fs bc))
-                      (remove (->> (bjitcask.core/data-files (:fs bc))
-                                   (map #(bjitcask.core/hint-file (:fs bc) %))
-                                   (set))))]
+      (doseq [{:keys [^ReentrantReadWriteLock lock]} entries]
+        (.. lock writeLock lock))
+      (.delete file)
+      (doseq [{:keys [^ReentrantReadWriteLock lock]} entries]
+        (.. lock writeLock unlock)))
+    (doseq [^File file (->> (bjitcask.core/hint-files (:fs bc))
+                            (remove (->> (bjitcask.core/data-files (:fs bc))
+                                         (map #(bjitcask.core/hint-file (:fs bc) %))
+                                         (set))))]
       (log/info (format "Deleting unused hint file %s" file))
       (.delete file))
     (log/info "Compacted" (count entries) "entries")))
