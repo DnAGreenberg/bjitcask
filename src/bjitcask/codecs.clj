@@ -119,8 +119,8 @@
 (gloss/defcodec bitcask-hint-header
   (gloss/ordered-map :tstamp :int32
                      :keysz :int16
-                     :total-len :int32
-                     :offset :int64))
+                     :total-len :uint32
+                     :offset :uint64))
 
 (gloss/defcodec bitcask-hint
   (gloss/header
@@ -142,7 +142,31 @@
   [hint]
   (gio/encode bitcask-hint hint))
 
-;;TODO: do the hint checksum
 (defn decode-all-hints
-  [buf]
-  (gio/decode-all bitcask-hint buf))
+  "Turns bytes into a sequence of HintEntries.
+   Returns nil if the hint file is corrupt."
+  [bytes]
+  (let [decode-next (#'gio/decoder bitcask-hint)
+        hint-crc32 (java.util.zip.CRC32.)]
+    (binding [gloss.core.protocols/complete? true]
+      (loop [buf-seq (gloss.data.bytes/dup-bytes (gio/to-buf-seq bytes))
+             vals []]
+        (let [
+              [hint remainder] (decode-next buf-seq)
+              {:keys [keysz]} (when hint
+                                (gio/decode bitcask-hint-header buf-seq false))
+              hint-bufs (when hint
+                          (-> buf-seq
+                              (gloss.data.bytes/dup-bytes)
+                              (gloss.data.bytes/take-bytes (+ keysz 18))
+                              (byte-streams/to-byte-arrays)))]
+          (cond
+            (not hint) vals 
+            (not= 0 (:tstamp hint))
+            (do (doseq [b (if (seq? hint-bufs)
+                            hint-bufs
+                            [hint-bufs])]
+                  (.update hint-crc32 b))
+                (recur remainder (conj vals hint))) 
+            (not= (.getValue hint-crc32) (:total-len hint))
+            nil))))))
