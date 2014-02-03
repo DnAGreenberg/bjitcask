@@ -2,6 +2,7 @@
   (:require [bjitcask.core :as core]
             byte-streams
             potemkin
+            [clojure.tools.logging :as log]
             [gloss.core :as gloss]
             [gloss.io :as gio]
             gloss.data.bytes.core)
@@ -146,13 +147,14 @@
   "Turns bytes into a sequence of HintEntries.
    Returns nil if the hint file is corrupt."
   [bytes]
+  (log/debug "decoding all hints" bytes)
   (let [decode-next (#'gio/decoder bitcask-hint)
         hint-crc32 (java.util.zip.CRC32.)]
     (binding [gloss.core.protocols/complete? true]
       (loop [buf-seq (gloss.data.bytes/dup-bytes (gio/to-buf-seq bytes))
-             vals []]
-        (let [
-              [hint remainder] (decode-next buf-seq)
+             vals []
+             expected-crc nil]
+        (let [[hint remainder] (decode-next buf-seq)
               {:keys [keysz]} (when hint
                                 (gio/decode bitcask-hint-header buf-seq false))
               hint-bufs (when hint
@@ -161,12 +163,16 @@
                               (gloss.data.bytes/take-bytes (+ keysz 18))
                               (byte-streams/to-byte-arrays)))]
           (cond
-            (not hint) vals 
+            (not hint)
+            (if (not= (.getValue hint-crc32) expected-crc)
+              (do (log/debug "Hint file is corrupted!")
+                  nil)
+              (do (log/debug "Hint file decoded")
+                  vals)) 
             (not= 0 (:tstamp hint))
             (do (doseq [b (if (seq? hint-bufs)
                             hint-bufs
                             [hint-bufs])]
                   (.update hint-crc32 b))
-                (recur remainder (conj vals hint))) 
-            (not= (.getValue hint-crc32) (:total-len hint))
-            nil))))))
+                (recur remainder (conj vals hint) nil)) 
+            :else (recur remainder vals (:total-len hint))))))))

@@ -25,7 +25,15 @@
       (.write hint buf)))
   core/IClose
   (close! [this]
+    (log/debug "Closing files")
     (.close data)
+    (core/append-hint
+      this
+      (codecs/encode-hint
+        (core/->HintEntry (codecs/to-bytes (byte-array 0))
+                          -1
+                          (.getValue hint-crc32)
+                          0)))
     (.close hint)))
 
 (defn get-file-offset-or-rollover
@@ -34,13 +42,7 @@
             (core/data-size file))
          ;TODO: got NPE here?
          (get-in file [:config :max-data-file-size]))
-    (do 
-      (core/append-hint file
-                        (codecs/encode-hint
-                          (core/->HintEntry (codecs/to-bytes (byte-array 0))
-                                            -1
-                                            (.getValue (:hint-crc32 file))
-                                            0)))
+    (do
       (core/close! file) 
       (log/info (format "Roll over data file. Size was %d, overflower was %d" curr-offset data-size))
       [(core/create fs) 0 (java.util.zip.CRC32.)])
