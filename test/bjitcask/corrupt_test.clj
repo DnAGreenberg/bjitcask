@@ -9,7 +9,7 @@
            [java.nio ByteBuffer]
            [java.nio.channels FileChannel]))
 
-(set-logger! (org.apache.log4j.Logger/getRootLogger) :level :debug)
+(set-logger! (org.apache.log4j.Logger/getRootLogger) :level :warn)
 
 (def config
   {:merge-frequency 1000000000})
@@ -93,7 +93,7 @@
         (is (byte-streams/bytes= v v'))))))
 
 (deftest hint-files-valid-data-files-corrupt
-  (let [my-bc  (bjitcask.registry/open "test-bc" config)
+  (let [my-bc (bjitcask.registry/open "test-bc" config)
         _ (bjitcask.registry/close my-bc)
         _ (rm-r (java.io.File. "test-bc"))
         my-bc (bjitcask.registry/open "test-bc" config)
@@ -113,6 +113,7 @@
                 (bjitcask.codecs/byte-count v')))
 
     (bjitcask.registry/close my-bc)
+    (Thread/sleep 100)
 
     ;; Corrupt the data file.
     (-> (File. "test-bc/1.bitcask.data")
