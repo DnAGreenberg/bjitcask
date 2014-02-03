@@ -74,8 +74,10 @@
   [buf]
   (let [entry (gio/decode bitcask-entry buf false)
         crc32 (bitcask-crc32 buf)]
-    (assert (= crc32 (bit-and 0xffffffff (:crc32 entry))) "CRC32 didn't match!")
-    entry))
+    (if (= crc32 (bit-and 0xffffffff (:crc32 entry)))
+      entry
+      (do (log/error "Corrupt data detected:" entry)
+          nil))))
 
 (defn decode-all-keydir-entries
   "Turns bytes from the data-file into a sequence of KeyDirEntries."
@@ -100,8 +102,10 @@
                                                  valsz
                                                  tstamp
                                                  (ReentrantReadWriteLock.))]
-            (assert (= crc32 (bit-and 0xffffffff (:crc32 entry))))
-            (recur remainder (conj keydir-entries keydir-entry) (+ curr-offset entry-len)))
+            (if (= crc32 (bit-and 0xffffffff (:crc32 entry)))
+              (recur remainder (conj keydir-entries keydir-entry) (+ curr-offset entry-len))
+              (do (log/error "Corrupt data detected:" entry)
+                  (recur remainder keydir-entries (+ curr-offset entry-len)))))
           keydir-entries)))))
 
 (defn decode-all-entries

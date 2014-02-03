@@ -55,21 +55,27 @@
       (get [kd key]
         (core/get kd key nil))
       (get [_ key not-found]
-        (let [key (make-binary-key key)
-              ^ReentrantReadWriteLock lock (:lock (.get chm key))
+        (let [bkey (make-binary-key key)
+              ^ReentrantReadWriteLock lock (:lock (.get chm bkey))
               value-bytes
               (when lock (.. lock readLock lock)
-                (try
-                  (let [keydir-value (.get chm key)
-                        data-file (:file keydir-value)
-                        value-offset (:value-offset keydir-value)
-                        value-len (:value-len keydir-value)]
-                    (core/scan fs
-                               data-file
-                               value-offset
-                               value-len))
-                  (finally
-                    (.. lock readLock unlock))))]
+                (-> (try
+                      (let [keydir-value (.get chm bkey)
+                            key-len (-> key
+                                        (codecs/to-bytes)
+                                        (codecs/byte-count))
+                            data-file (:file keydir-value)
+                            value-offset (:value-offset keydir-value)
+                            entry-offset (- value-offset core/header-size key-len)
+                            value-len (:value-len keydir-value)]
+                        (core/scan fs
+                                   data-file
+                                   entry-offset
+                                   (+ value-len key-len core/header-size)))
+                      (finally
+                        (.. lock readLock unlock)))
+                    (codecs/decode-entry)
+                    (:value)))]
 
           (if (and value-bytes
                    ; TODO aysylu: refactor out the hard-coded tombstone value into config

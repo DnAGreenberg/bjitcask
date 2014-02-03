@@ -125,4 +125,5 @@
     (let [my-bc (bjitcask.registry/open "test-bc" config)
           chm (core/keydir (:keydir my-bc))
           bkey (kd/make-binary-key key)]
-      (is (.containsKey chm bkey)))))
+      (is (.containsKey chm bkey))
+      (is (= (core/get (:keydir my-bc) key :miss) :miss)))))
