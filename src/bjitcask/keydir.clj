@@ -113,18 +113,19 @@
         hint-entry (core/->HintEntry key-buf curr-offset total-len now)
         hint-buf (codecs/encode-hint hint-entry)
         val-offset (+ curr-offset core/header-size key-len)
-        keydir-entry (core/->KeyDirEntry key
-                                         (:data-file file)
-                                         val-offset
-                                         val-len
-                                         now
-                                         (or (:lock old-keydir-entry)
-                                             (ReentrantReadWriteLock.)))]
+        keydir-entry #(core/->KeyDirEntry key
+                                          (:data-file file)
+                                          val-offset
+                                          val-len
+                                          now
+                                          %)]
     (core/append-data file data-buf)
     (core/append-hint file hint-buf)
-    (.put chm (or (:key old-keydir-entry)
-                  bkey)
-          keydir-entry) 
+    (when-let [old (or old-keydir-entry
+                       (.putIfAbsent
+                         chm bkey (keydir-entry (ReentrantReadWriteLock.))))]
+      (.put chm (:key old)
+            (keydir-entry (:lock old))))
     [file (+ curr-offset total-len)]))
 
 (defn process-command
