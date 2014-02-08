@@ -26,13 +26,9 @@ bjitcask can open a lot of files. Maybe you need more file descriptors? Try:
 ulimit -n 10000
 ```
 
-## TODOs
+## Gotchas
 
-bjitcask currently doesn't release memory used to store keys when they're deleted. Also, keys should be stored in off-heap memory.
-
-Startup options, such as merging parameters and file size limits, are currently ignored.
-
-Use proper logging to communicate information about the status of merging.
+bjitcask currently doesn't release memory used to store keys when they're deleted.
 
 ## License
 
